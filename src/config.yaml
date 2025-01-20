@@ -1,0 +1,12 @@
+server:
+  host: "localhost"
+  port: 8081
+  session_encrypt_key: ${session_encrypt_key}
+database:
+  host: "localhost"
+  user: "postgres"
+  password: ${password}
+  name: "ginExample"
+  port: 5432
+logger:
+  level: "info"
