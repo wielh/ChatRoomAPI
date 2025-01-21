@@ -26,28 +26,28 @@ var def = loggerLevelDefiniton{
 
 func NewDebugLogger() Logger {
 	return &loggerReciverImpl{
-		level:    0,
+		level:    def.Debug,
 		levelDef: def,
 	}
 }
 
 func NewLogger() Logger {
 	return &loggerReciverImpl{
-		level:    1,
+		level:    def.Info,
 		levelDef: def,
 	}
 }
 
 func NewWarnLogger() Logger {
 	return &loggerReciverImpl{
-		level:    2,
+		level:    def.Warning,
 		levelDef: def,
 	}
 }
 
 func NewErrorLogger() Logger {
 	return &loggerReciverImpl{
-		level:    3,
+		level:    def.Error,
 		levelDef: def,
 	}
 }

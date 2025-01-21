@@ -3,10 +3,9 @@ package controller
 import (
 	"ChatRoomAPI/src"
 	"ChatRoomAPI/src/common"
+	"ChatRoomAPI/src/logger"
 	"fmt"
-	"log"
 	"net/http"
-	"runtime/debug"
 	"sync"
 	"time"
 
@@ -36,7 +35,7 @@ func commonMiddleware(g *gin.RouterGroup) {
 // ===
 var readLoginSession gin.HandlerFunc
 var loginFilter func(*gin.Context)
-var logger = log.New(gin.DefaultWriter, "", log.LstdFlags)
+var log = logger.NewLogger()
 var once sync.Once
 
 func NewLoginFilter() func(*gin.Context) {
@@ -121,18 +120,20 @@ func customLogger() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 		duration := time.Since(start)
-
-		method := c.Request.Method
-		path := c.Request.URL.Path
-		status := c.Writer.Status()
-		clientIP := c.ClientIP()
+		data := map[string]any{
+			"method":   c.Request.Method,
+			"path":     c.Request.URL.Path,
+			"status":   c.Writer.Status(),
+			"clientIP": c.ClientIP(),
+			"start":    start,
+			"duration": duration,
+			"errors":   c.Errors,
+		}
 
 		if len(c.Errors) > 0 {
-			logMessage := "fatal: [%s] %s | %3d | %13v | %15s | %s  | <<< %+v >>> \n"
-			logger.Fatalf(logMessage, time.Now().Format(time.RFC3339), method, status, duration, clientIP, path, c.Errors)
+			log.Error(common.GetUUID(c), "customRecoveryError", data, nil)
 		} else {
-			logMessage := "info: [%s] %s | %3d | %13v | %15s | %s\n"
-			logger.Printf(logMessage, time.Now().Format(time.RFC3339), method, status, duration, clientIP, path)
+			log.Info(common.GetUUID(c), "customLoggerInfo", data, nil)
 		}
 	}
 }
@@ -141,7 +142,23 @@ func customRecovery() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		defer func() {
 			if err := recover(); err != nil {
-				fmt.Printf("Panic: %v\nStack Trace: %s\n", err, debug.Stack())
+				var panicMessage string
+				switch v := err.(type) {
+				case string:
+					panicMessage = v
+				case error:
+					panicMessage = v.Error()
+				default:
+					panicMessage = fmt.Sprintf("Unknown panic: %v", v)
+				}
+
+				data := map[string]any{
+					"method":   c.Request.Method,
+					"path":     c.Request.URL.Path,
+					"clientIP": c.ClientIP(),
+					"panic":    panicMessage,
+				}
+				log.Error(common.GetUUID(c), "customRecovery", data, nil)
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"message": "Internal Server Error",
 				})
