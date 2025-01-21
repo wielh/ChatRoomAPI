@@ -4,6 +4,7 @@ import (
 	"ChatRoomAPI/src/common"
 	"ChatRoomAPI/src/dto"
 	"ChatRoomAPI/src/dtoError"
+	"ChatRoomAPI/src/logger"
 	"ChatRoomAPI/src/repository"
 	"context"
 )
@@ -21,6 +22,7 @@ type roomUserServiceImpl struct {
 	applicationRepo repository.ApplicationRepository
 	invitationRepo  repository.InvitationRepository
 	errWarpper      dtoError.ServiceErrorWarpper
+	logger          logger.Logger
 }
 
 var roomUser RoomUserService
@@ -31,6 +33,7 @@ func init() {
 		applicationRepo: repository.GetApplicationRepository(),
 		invitationRepo:  repository.GetInvitationRepository(),
 		errWarpper:      dtoError.GetServiceErrorWarpper(),
+		logger:          logger.NewLogger(),
 	}
 }
 
@@ -39,10 +42,15 @@ func GetRoomUserService() RoomUserService {
 }
 
 func (r *roomUserServiceImpl) ConfrimInvite(ctx context.Context, req *dto.ConfrimInviteRequest) (*dto.ConfrimInviteResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	roomExist, err := r.roomRepo.RoomExist(txContext, req.RoomID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.roomRepo.RoomExist", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !roomExist {
 		tx.Rollback()
@@ -52,6 +60,7 @@ func (r *roomUserServiceImpl) ConfrimInvite(ctx context.Context, req *dto.Confri
 	InRoom, err := r.roomRepo.CheckUserInRoom(txContext, req.RoomID, req.UserID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.roomRepo.CheckUserInRoom", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if InRoom {
 		tx.Rollback()
@@ -61,6 +70,7 @@ func (r *roomUserServiceImpl) ConfrimInvite(ctx context.Context, req *dto.Confri
 	exist, err := r.invitationRepo.CheckInvitationExist(txContext, req.RoomID, req.UserID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.invitationRepo.CheckInvitationExist", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !exist {
 		tx.Rollback()
@@ -70,6 +80,7 @@ func (r *roomUserServiceImpl) ConfrimInvite(ctx context.Context, req *dto.Confri
 	if req.Allowed {
 		_, err = r.roomRepo.AddUser(txContext, req.RoomID, req.UserID)
 		if err != nil {
+			r.logger.Error(requestId, "r.roomRepo.AddUser", req, err)
 			tx.Rollback()
 			return nil, r.errWarpper.NewDBServiceError(err)
 		}
@@ -77,6 +88,7 @@ func (r *roomUserServiceImpl) ConfrimInvite(ctx context.Context, req *dto.Confri
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 
@@ -85,8 +97,13 @@ func (r *roomUserServiceImpl) ConfrimInvite(ctx context.Context, req *dto.Confri
 }
 
 func (r *roomUserServiceImpl) FetchInvitationsByUser(ctx context.Context, req *dto.FetchInvitationByUserRequest) (*dto.FetchInvitationByUserResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	records, err := r.invitationRepo.FetchInvitationsByUser(ctx, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.invitationRepo.FetchInvitationsByUser", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	}
 
@@ -103,9 +120,14 @@ func (r *roomUserServiceImpl) FetchInvitationsByUser(ctx context.Context, req *d
 }
 
 func (r *roomUserServiceImpl) RoomJoinApply(ctx context.Context, req *dto.RoomJoinApplyRequest) (*dto.RoomJoinApplyResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	roomExist, err := r.roomRepo.RoomExist(txContext, req.RoomID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.RoomExist", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !roomExist {
@@ -115,6 +137,7 @@ func (r *roomUserServiceImpl) RoomJoinApply(ctx context.Context, req *dto.RoomJo
 
 	isUser, err := r.roomRepo.CheckUserInRoom(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.CheckUserInRoom", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if isUser {
@@ -124,6 +147,7 @@ func (r *roomUserServiceImpl) RoomJoinApply(ctx context.Context, req *dto.RoomJo
 
 	exist, err := r.applicationRepo.CheckApplicationExist(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.applicationRepo.CheckApplicationExist", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if exist {
@@ -133,6 +157,7 @@ func (r *roomUserServiceImpl) RoomJoinApply(ctx context.Context, req *dto.RoomJo
 
 	ok, err := r.applicationRepo.RoomJoinApply(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.applicationRepo.RoomJoinApply", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !ok {
@@ -142,16 +167,22 @@ func (r *roomUserServiceImpl) RoomJoinApply(ctx context.Context, req *dto.RoomJo
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &dto.RoomJoinApplyResponse{}, nil
 }
 
 func (r *roomUserServiceImpl) RoomJoinApplyCancel(ctx context.Context, req *dto.RoomJoinApplyCancelRequest) (*dto.RoomJoinApplyCancelResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	exist, err := r.applicationRepo.CheckApplicationExist(txContext, req.RoomID, req.UserID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.applicationRepo.CheckApplicationExist", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !exist {
 		tx.Rollback()
@@ -161,6 +192,7 @@ func (r *roomUserServiceImpl) RoomJoinApplyCancel(ctx context.Context, req *dto.
 	ok, err := r.applicationRepo.RoomJoinApplyRequestDelete(txContext, req.RoomID, req.UserID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.applicationRepo.RoomJoinApplyRequestDelete", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !ok {
 		tx.Rollback()
@@ -169,14 +201,20 @@ func (r *roomUserServiceImpl) RoomJoinApplyCancel(ctx context.Context, req *dto.
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &dto.RoomJoinApplyCancelResponse{}, nil
 }
 
 func (r *roomUserServiceImpl) FetchApplicationByUser(ctx context.Context, req *dto.FetchApplicationByUserRequest) (*dto.FetchApplicationByUserResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	records, err := r.applicationRepo.FetchApplicationsByUser(ctx, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.applicationRepo.FetchApplicationsByUser", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	}
 

@@ -2,7 +2,7 @@ package controller
 
 import (
 	"ChatRoomAPI/src"
-	"context"
+	"ChatRoomAPI/src/common"
 	"fmt"
 	"log"
 	"net/http"
@@ -14,7 +14,6 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-contrib/timeout"
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	limit "github.com/yangxikun/gin-limit-by-key"
 	"golang.org/x/time/rate"
 )
@@ -34,6 +33,7 @@ func commonMiddleware(g *gin.RouterGroup) {
 }
 
 // ==============================================================================================
+// ===
 var readLoginSession gin.HandlerFunc
 var loginFilter func(*gin.Context)
 var logger = log.New(gin.DefaultWriter, "", log.LstdFlags)
@@ -76,23 +76,15 @@ func GetSessionValue(c *gin.Context) (bool, uint64, string) {
 	return ok1 && ok2, id, username
 }
 
-//==============================================================================================
+// ===
+// ==============================================================================================
 
 func customRequestUUIDGenerator() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		requestID := uuid.New().String()
-		c.Set("RequestID", requestID)
+		common.SetUUID(c)
 		c.Next()
 	}
 }
-
-func GetRequestUUID(c context.Context) (string, bool) {
-	val := c.Value("RequestID")
-	uuid, ok := val.(string)
-	return uuid, ok
-}
-
-//==============================================================================================
 
 func customAllLimiter() gin.HandlerFunc {
 	return limit.NewRateLimiter(func(c *gin.Context) string {

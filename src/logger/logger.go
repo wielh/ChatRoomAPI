@@ -7,11 +7,11 @@ import (
 )
 
 type Logger interface {
-	SetLevel(level int)
-	Debug(requestId string, checkpoint string, data map[string]any, err error)
-	Info(requestId string, checkpoint string, data map[string]any, err error)
-	Warning(requestId string, checkpoint string, data map[string]any, err error)
-	Error(requestId string, checkpoint string, data map[string]any, err error)
+	SetLevel(level int) Logger
+	Debug(requestId string, checkpoint string, data any, err error)
+	Info(requestId string, checkpoint string, data any, err error)
+	Warning(requestId string, checkpoint string, data any, err error)
+	Error(requestId string, checkpoint string, data any, err error)
 }
 
 type loggerLevelDefiniton struct {
@@ -21,8 +21,9 @@ type loggerLevelDefiniton struct {
 	Error   int
 }
 
-func NewLogger(level int) Logger {
+func NewLogger() Logger {
 	return &loggerReciverImpl{
+		level: 1,
 		levelDef: loggerLevelDefiniton{
 			Debug: 0, Info: 1, Warning: 2, Error: 3,
 		},
@@ -34,41 +35,42 @@ type loggerReciverImpl struct {
 	levelDef loggerLevelDefiniton
 }
 
-func (l *loggerReciverImpl) Debug(requestId string, checkpoint string, data map[string]any, err error) {
-	if l.level >= l.levelDef.Debug {
+func (l *loggerReciverImpl) Debug(requestId string, checkpoint string, data any, err error) {
+	if l.level <= l.levelDef.Debug {
 		l.execute("Debug", requestId, checkpoint, data, err)
 	}
 }
 
-func (l *loggerReciverImpl) Info(requestId string, checkpoint string, data map[string]any, err error) {
-	if l.level >= l.levelDef.Info {
+func (l *loggerReciverImpl) Info(requestId string, checkpoint string, data any, err error) {
+	if l.level <= l.levelDef.Info {
 		l.execute("Info", requestId, checkpoint, data, err)
 	}
 }
 
-func (l *loggerReciverImpl) Warning(requestId string, checkpoint string, data map[string]any, err error) {
-	if l.level >= l.levelDef.Warning {
+func (l *loggerReciverImpl) Warning(requestId string, checkpoint string, data any, err error) {
+	if l.level <= l.levelDef.Warning {
 		l.execute("Warning", requestId, checkpoint, data, err)
 	}
 }
 
-func (l *loggerReciverImpl) Error(requestId string, checkpoint string, data map[string]any, err error) {
-	if l.level >= l.levelDef.Error {
+func (l *loggerReciverImpl) Error(requestId string, checkpoint string, data any, err error) {
+	if l.level <= l.levelDef.Error {
 		l.execute("Error", requestId, checkpoint, data, err)
 	}
 }
 
-func (l *loggerReciverImpl) SetLevel(level int) {
+func (l *loggerReciverImpl) SetLevel(level int) Logger {
 	if level < l.levelDef.Debug {
 		l.level = l.levelDef.Debug
 	} else if level > l.levelDef.Error {
 		l.level = l.levelDef.Error
 	}
 	l.level = level
+	return l
 }
 
 func (l *loggerReciverImpl) getCaller(i int) string {
-	pc := make([]uintptr, 5)
+	pc := make([]uintptr, 10)
 	n := runtime.Callers(0, pc)
 	if i > n {
 		i = n
@@ -77,14 +79,18 @@ func (l *loggerReciverImpl) getCaller(i int) string {
 	return fn.Name()
 }
 
-func (l *loggerReciverImpl) execute(level string, requestId string, checkpoint string, data map[string]any, err error) {
-	var errStr string
-	if err != nil {
-		errStr = err.Error()
-	} else {
-		errStr = ""
-	}
-	message := fmt.Sprintf("[%s][%s] requestId: %s, caller: %s, checkpoint: %s, error: %s, data:%+v",
-		level, time.Now().Format("2006-01-02 15:04:05"), requestId, l.getCaller(1), checkpoint, errStr, data)
-	fmt.Println(message)
+func (l *loggerReciverImpl) execute(level string, requestId string, checkpoint string, data any, err error) {
+	caller := l.getCaller(4)
+	time := time.Now().Format("2006-01-02 15:04:05.000")
+	go func() {
+		var errStr string
+		if err != nil {
+			errStr = err.Error()
+		} else {
+			errStr = ""
+		}
+		message := fmt.Sprintf("[%s][%s] requestId:{%s}, caller:{%s}, checkpoint:{%s}, error:{%s}, data:{%+v}",
+			level, time, requestId, caller, checkpoint, errStr, data)
+		fmt.Println(message)
+	}()
 }

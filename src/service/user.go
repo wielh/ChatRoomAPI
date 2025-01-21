@@ -1,8 +1,10 @@
 package service
 
 import (
+	"ChatRoomAPI/src/common"
 	"ChatRoomAPI/src/dto"
 	"ChatRoomAPI/src/dtoError"
+	"ChatRoomAPI/src/logger"
 	"ChatRoomAPI/src/repository"
 	"context"
 	"time"
@@ -18,6 +20,7 @@ type UserService interface {
 }
 
 type userServiceImpl struct {
+	logger      logger.Logger
 	accountRepo repository.AccountRepository
 	errWarpper  dtoError.ServiceErrorWarpper
 }
@@ -28,6 +31,7 @@ func init() {
 	user = &userServiceImpl{
 		accountRepo: repository.GetAccountRepository(),
 		errWarpper:  dtoError.GetServiceErrorWarpper(),
+		logger:      logger.NewLogger(),
 	}
 }
 
@@ -36,21 +40,36 @@ func GetAccountService() UserService {
 }
 
 func (a *userServiceImpl) UserRegisterService(ctx context.Context, req *dto.UserRegisterRequest) (*dto.UserRegisterResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	data := map[string]any{
+		"username": req.Username,
+		"name":     req.Name,
+		"email":    req.Email,
+	}
+	a.logger.Info(requestId, "start", data, nil)
+	defer func() { a.logger.Info(requestId, "end", data, nil) }()
+
 	hashedPassword, _ := hashPassword(req.Password)
 	parsedTime, _ := time.Parse("2006-01-02", req.Birthday)
-
 	userModel, ok, err := a.accountRepo.UserRegister(ctx, req.Username, hashedPassword, req.Name, req.Email, parsedTime)
 	if err != nil {
-		return &dto.UserRegisterResponse{}, a.errWarpper.NewDBServiceError(err)
+		a.logger.Error(requestId, "a.accountRepo.UserRegister", data, err)
+		return nil, a.errWarpper.NewDBServiceError(err)
 	} else if !ok {
-		return &dto.UserRegisterResponse{}, a.errWarpper.NewUserHasRegisterdError(req.Username)
+		return nil, a.errWarpper.NewUserHasRegisterdError(req.Username)
 	}
 	return &dto.UserRegisterResponse{ID: userModel.Id}, nil
 }
 
 func (a *userServiceImpl) UserLoginService(ctx context.Context, req *dto.UserLoginRequest) (*dto.UserLoginResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	data := map[string]any{"username": req.Username}
+	a.logger.Info(requestId, "start", data, nil)
+	defer func() { a.logger.Info(requestId, "end", data, nil) }()
+
 	userModel, exist, err := a.accountRepo.SelectUserByName(ctx, req.Username)
 	if err != nil {
+		a.logger.Error(requestId, "a.accountRepo.SelectUserByName", data, err)
 		return nil, a.errWarpper.NewDBServiceError(err)
 	} else if !exist {
 		return nil, a.errWarpper.NewLoginFailedServiceError(nil)
@@ -68,9 +87,15 @@ func (a *userServiceImpl) UserLoginService(ctx context.Context, req *dto.UserLog
 }
 
 func (a *userServiceImpl) ResetPasswordService(ctx context.Context, req *dto.ResetPasswordRequest) *dtoError.ServiceError {
+	requestId := common.GetUUID(ctx)
+	data := map[string]any{"username": req.Username}
+	a.logger.Info(requestId, "start", data, nil)
+	defer func() { a.logger.Info(requestId, "end", data, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	user, ok, err := a.accountRepo.SelectUserByName(txContext, req.Username)
 	if err != nil {
+		a.logger.Error(requestId, "a.accountRepo.SelectUserByName", data, err)
 		tx.Rollback()
 		return a.errWarpper.NewDBServiceError(err)
 	} else if !ok {
@@ -87,6 +112,7 @@ func (a *userServiceImpl) ResetPasswordService(ctx context.Context, req *dto.Res
 	newHashPassword, _ := hashPassword(req.NewPassword)
 	ok, err = a.accountRepo.UpdatePassword(txContext, user.Id, newHashPassword)
 	if err != nil {
+		a.logger.Error(requestId, "a.accountRepo.UpdatePassword", data, err)
 		tx.Rollback()
 		return a.errWarpper.NewDBServiceError(err)
 	} else if !ok {
@@ -96,14 +122,21 @@ func (a *userServiceImpl) ResetPasswordService(ctx context.Context, req *dto.Res
 
 	err = tx.Commit().Error
 	if err != nil {
+		a.logger.Error(requestId, "tx.Commit", data, err)
 		return a.errWarpper.NewDBCommitServiceError(err)
 	}
 	return nil
 }
 
 func (a *userServiceImpl) UserInfoService(ctx context.Context, req *dto.GetUserInfoRequest) (*dto.GetUserInfoResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	data := map[string]any{"id": req.ID}
+	a.logger.Info(requestId, "start", data, nil)
+	defer func() { a.logger.Info(requestId, "end", data, nil) }()
+
 	user, err := a.accountRepo.UserInfo(ctx, req.ID)
 	if err != nil {
+		a.logger.Error(requestId, "a.accountRepo.UserInfo", data, err)
 		return nil, a.errWarpper.NewDBServiceError(err)
 	}
 

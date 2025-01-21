@@ -175,7 +175,6 @@ func (s *ServiceErrorWarpperImpl) NewRessetPasswordServiceError(err error) *Serv
 	}
 }
 
-// NewUserNotExist implements ServiceErrorWarpper.
 func (s *ServiceErrorWarpperImpl) NewUserNotExist(Id uint64) *ServiceError {
 	return &ServiceError{
 		StatusCode:     http.StatusUnauthorized,

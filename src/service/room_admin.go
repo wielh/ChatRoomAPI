@@ -1,8 +1,10 @@
 package service
 
 import (
+	"ChatRoomAPI/src/common"
 	"ChatRoomAPI/src/dto"
 	"ChatRoomAPI/src/dtoError"
+	"ChatRoomAPI/src/logger"
 	"ChatRoomAPI/src/repository"
 	"context"
 )
@@ -21,8 +23,9 @@ type roomAdminServiceImpl struct {
 	roomRepo        repository.RoomRepository
 	applicationRepo repository.ApplicationRepository
 	invitationRepo  repository.InvitationRepository
-	errWarpper      dtoError.ServiceErrorWarpper
 	userRepo        repository.AccountRepository
+	errWarpper      dtoError.ServiceErrorWarpper
+	logger          logger.Logger
 }
 
 var roomAdmin RoomAdminService
@@ -34,8 +37,8 @@ func init() {
 		invitationRepo:  repository.GetInvitationRepository(),
 		errWarpper:      dtoError.GetServiceErrorWarpper(),
 		userRepo:        repository.GetAccountRepository(),
+		logger:          logger.NewLogger(),
 	}
-
 }
 
 func GetRoomAdminService() RoomAdminService {
@@ -43,18 +46,22 @@ func GetRoomAdminService() RoomAdminService {
 }
 
 func (r *roomAdminServiceImpl) AdminChange(ctx context.Context, req *dto.AdminChangeRequest) (*dto.AdminChangeResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	if req.AdminUserID == req.UserID {
-		return nil,
-			&dtoError.ServiceError{
-				StatusCode:     400,
-				InternalError:  nil,
-				ExtrenalReason: "AdminUserID and UserID are the same",
-			}
+		return nil, &dtoError.ServiceError{
+			StatusCode:     400,
+			InternalError:  nil,
+			ExtrenalReason: "AdminUserID and UserID are the same",
+		}
 	}
 
 	txContext, tx := repository.SetTxContext(ctx)
 	roomExist, err := r.roomRepo.RoomExist(txContext, req.RoomID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.RoomExist", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !roomExist {
@@ -64,6 +71,7 @@ func (r *roomAdminServiceImpl) AdminChange(ctx context.Context, req *dto.AdminCh
 
 	isAdmin, err := r.roomRepo.CheckAdminUserInRoom(txContext, req.RoomID, req.AdminUserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.CheckAdminUserInRoom", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isAdmin {
@@ -73,6 +81,7 @@ func (r *roomAdminServiceImpl) AdminChange(ctx context.Context, req *dto.AdminCh
 
 	isUser, err := r.roomRepo.CheckUserInRoom(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.CheckUserInRoom", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isUser {
@@ -82,6 +91,7 @@ func (r *roomAdminServiceImpl) AdminChange(ctx context.Context, req *dto.AdminCh
 
 	ok, err := r.roomRepo.AdminChange(txContext, req.RoomID, req.AdminUserID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.AdminChange", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !ok {
@@ -91,16 +101,22 @@ func (r *roomAdminServiceImpl) AdminChange(ctx context.Context, req *dto.AdminCh
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &dto.AdminChangeResponse{}, nil
 }
 
 func (r *roomAdminServiceImpl) InviteNewUser(ctx context.Context, req *dto.InviteNewUserRequest) (*dto.InviteNewUserResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	roomExist, err := r.roomRepo.RoomExist(txContext, req.RoomID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.roomRepo.RoomExist", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !roomExist {
 		tx.Rollback()
@@ -109,6 +125,7 @@ func (r *roomAdminServiceImpl) InviteNewUser(ctx context.Context, req *dto.Invit
 
 	isAdmin, err := r.roomRepo.CheckAdminUserInRoom(txContext, req.RoomID, req.AdminUserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.CheckAdminUserInRoom", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isAdmin {
@@ -118,6 +135,7 @@ func (r *roomAdminServiceImpl) InviteNewUser(ctx context.Context, req *dto.Invit
 
 	userExist, err := r.userRepo.CheckUserExist(txContext, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.userRepo.CheckUserExist", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !userExist {
@@ -127,6 +145,7 @@ func (r *roomAdminServiceImpl) InviteNewUser(ctx context.Context, req *dto.Invit
 
 	isUser, err := r.roomRepo.CheckUserInRoom(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.CheckUserInRoom", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if isUser {
@@ -136,6 +155,7 @@ func (r *roomAdminServiceImpl) InviteNewUser(ctx context.Context, req *dto.Invit
 
 	repeat, err := r.invitationRepo.CheckInvitationExist(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.invitationRepo.CheckInvitationExist", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if repeat {
@@ -145,21 +165,28 @@ func (r *roomAdminServiceImpl) InviteNewUser(ctx context.Context, req *dto.Invit
 
 	err = r.invitationRepo.InviteNewUser(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.invitationRepo.InviteNewUser", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	}
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &dto.InviteNewUserResponse{}, nil
 }
 
 func (r *roomAdminServiceImpl) InviteNewUserCancel(ctx context.Context, req *dto.InviteNewUserCancelRequest) (*dto.InviteNewUserCancelResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	isAdmin, err := r.roomRepo.CheckAdminUserInRoom(txContext, req.RoomID, req.AdminUserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.CheckAdminUserInRoom", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isAdmin {
@@ -169,6 +196,7 @@ func (r *roomAdminServiceImpl) InviteNewUserCancel(ctx context.Context, req *dto
 
 	invited, err := r.invitationRepo.CheckInvitationExist(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.invitationRepo.CheckInvitationExist", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !invited {
@@ -178,6 +206,7 @@ func (r *roomAdminServiceImpl) InviteNewUserCancel(ctx context.Context, req *dto
 
 	ok, err := r.invitationRepo.InviteNewUserRequestDelete(txContext, req.RoomID, req.UserID)
 	if err != nil {
+		r.logger.Error(requestId, "r.invitationRepo.InviteNewUserRequestDelete", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !ok {
@@ -187,15 +216,21 @@ func (r *roomAdminServiceImpl) InviteNewUserCancel(ctx context.Context, req *dto
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &dto.InviteNewUserCancelResponse{}, nil
 }
 
 func (r *roomAdminServiceImpl) FetchInvitationsByAdmin(ctx context.Context, req *dto.FetchInvitationByAdminRequest) (*dto.FetchInvitationByAdminResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	isAdmin, err := r.roomRepo.CheckAdminUserInRoom(txContext, req.RoomID, req.AdminID)
 	if err != nil {
+		r.logger.Error(requestId, "r.roomRepo.CheckAdminUserInRoom", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isAdmin {
@@ -205,6 +240,7 @@ func (r *roomAdminServiceImpl) FetchInvitationsByAdmin(ctx context.Context, req 
 
 	records, err := r.invitationRepo.FetchInvitationsByAdmin(txContext, req.AdminID)
 	if err != nil {
+		r.logger.Error(requestId, "r.invitationRepo.FetchInvitationsByAdmin", req, err)
 		tx.Rollback()
 		return nil, r.errWarpper.NewDBServiceError(err)
 	}
@@ -219,16 +255,22 @@ func (r *roomAdminServiceImpl) FetchInvitationsByAdmin(ctx context.Context, req 
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &answer, nil
 }
 
 func (r *roomAdminServiceImpl) ConfrimApply(ctx context.Context, req *dto.ConfrimApplyRequest) (*dto.ConfrimApplyResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	roomExist, err := r.roomRepo.RoomExist(txContext, req.RoomID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.roomRepo.RoomExist", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !roomExist {
 		tx.Rollback()
@@ -239,6 +281,7 @@ func (r *roomAdminServiceImpl) ConfrimApply(ctx context.Context, req *dto.Confri
 	isAdmin, err := r.roomRepo.CheckAdminUserInRoom(txContext, req.RoomID, req.AdminUserID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.roomRepo.CheckAdminUserInRoom", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isAdmin {
 		tx.Rollback()
@@ -248,6 +291,7 @@ func (r *roomAdminServiceImpl) ConfrimApply(ctx context.Context, req *dto.Confri
 	isUser, err := r.roomRepo.CheckUserInRoom(txContext, req.RoomID, req.UserID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.roomRepo.CheckUserInRoom", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if isUser {
 		tx.Rollback()
@@ -257,6 +301,7 @@ func (r *roomAdminServiceImpl) ConfrimApply(ctx context.Context, req *dto.Confri
 	applied, err := r.applicationRepo.CheckApplicationExist(txContext, req.RoomID, req.UserID)
 	if err != nil {
 		tx.Rollback()
+		r.logger.Error(requestId, "r.applicationRepo.CheckApplicationExist", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !applied {
 		tx.Rollback()
@@ -267,12 +312,14 @@ func (r *roomAdminServiceImpl) ConfrimApply(ctx context.Context, req *dto.Confri
 		_, err = r.roomRepo.AddUser(txContext, req.RoomID, req.UserID)
 		if err != nil {
 			tx.Rollback()
+			r.logger.Error(requestId, "r.roomRepo.AddUser", req, err)
 			return nil, r.errWarpper.NewDBServiceError(err)
 		}
 	}
 
 	err = tx.Commit().Error
 	if err != nil {
+		r.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	go r.applicationRepo.RoomJoinApplyRequestDelete(txContext, req.RoomID, req.UserID)
@@ -280,34 +327,36 @@ func (r *roomAdminServiceImpl) ConfrimApply(ctx context.Context, req *dto.Confri
 }
 
 func (r *roomAdminServiceImpl) FetchApplicationByAdmin(ctx context.Context, req *dto.FetchApplicationByAdminRequest) (*dto.FetchApplicationByAdminResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
+
 	txContext, tx := repository.SetTxContext(ctx)
 	roomExist, err := r.roomRepo.RoomExist(txContext, req.RoomID)
 	if err != nil {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "r.roomRepo.RoomExist", req, err)
+		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !roomExist {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewRoomNotExistError(req.RoomID)
-		return nil, serviceErr
+		return nil, r.errWarpper.NewRoomNotExistError(req.RoomID)
 	}
 
 	isAdmin, err := r.roomRepo.CheckAdminUserInRoom(txContext, req.RoomID, req.AdminUserID)
 	if err != nil {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "r.roomRepo.CheckAdminUserInRoom", req, err)
+		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isAdmin {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewNotAdminOfRoomError(req.AdminUserID, req.RoomID)
-		return nil, serviceErr
+		return nil, r.errWarpper.NewNotAdminOfRoomError(req.AdminUserID, req.RoomID)
 	}
 
 	records, err := r.applicationRepo.FetchApplicationsByAdmin(txContext, req.RoomID)
 	if err != nil {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "r.applicationRepo.FetchApplicationsByAdmin", req, err)
+		return nil, r.errWarpper.NewDBServiceError(err)
 	}
 
 	answer := dto.FetchApplicationByAdminResponse{RoomID: req.RoomID}
@@ -320,63 +369,62 @@ func (r *roomAdminServiceImpl) FetchApplicationByAdmin(ctx context.Context, req 
 
 	err = tx.Commit().Error
 	if err != nil {
-		serviceErr := r.errWarpper.NewDBCommitServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "tx.Commit", req, err)
+		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &answer, nil
 }
 
 func (r *roomAdminServiceImpl) DeleteUser(ctx context.Context, req *dto.DeleteUserRequest) (*dto.DeleteUserResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	r.logger.Info(requestId, "start", req, nil)
+	defer func() { r.logger.Info(requestId, "end", req, nil) }()
 
 	txContext, tx := repository.SetTxContext(ctx)
 	roomExist, err := r.roomRepo.RoomExist(txContext, req.RoomID)
 	if err != nil {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "r.roomRepo.RoomExist", req, err)
+		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !roomExist {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewRoomNotExistError(req.RoomID)
-		return nil, serviceErr
+		return nil, r.errWarpper.NewRoomNotExistError(req.RoomID)
 	}
 
 	isAdmin, err := r.roomRepo.CheckAdminUserInRoom(txContext, req.RoomID, req.AdminUserID)
 	if err != nil {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "r.roomRepo.CheckAdminUserInRoom", req, err)
+		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isAdmin {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewNotAdminOfRoomError(req.AdminUserID, req.RoomID)
-		return nil, serviceErr
+		return nil, r.errWarpper.NewNotAdminOfRoomError(req.AdminUserID, req.RoomID)
 	}
 
 	isUser, err := r.roomRepo.CheckUserInRoom(txContext, req.RoomID, req.UserID)
 	if err != nil {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "r.roomRepo.CheckUserInRoom", req, err)
+		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !isUser {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewUserNotInRoomError(req.UserID, req.RoomID)
-		return nil, serviceErr
+		return nil, r.errWarpper.NewUserNotInRoomError(req.UserID, req.RoomID)
 	}
 
 	ok, err := r.roomRepo.DeleteUser(txContext, req.RoomID, req.AdminUserID, req.UserID)
 	if err != nil {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "r.roomRepo.DeleteUser", req, err)
+		return nil, r.errWarpper.NewDBServiceError(err)
 	} else if !ok {
 		tx.Rollback()
-		serviceErr := r.errWarpper.NewDBNoAffectedServiceError()
-		return nil, serviceErr
+		return nil, r.errWarpper.NewDBNoAffectedServiceError()
 	}
 
 	err = tx.Commit().Error
 	if err != nil {
-		serviceErr := r.errWarpper.NewDBCommitServiceError(err)
-		return nil, serviceErr
+		r.logger.Error(requestId, "tx.Commit", req, err)
+		return nil, r.errWarpper.NewDBCommitServiceError(err)
 	}
 	return &dto.DeleteUserResponse{}, nil
 }
