@@ -7,7 +7,6 @@ import (
 )
 
 type Logger interface {
-	SetLevel(level int) Logger
 	Debug(requestId string, checkpoint string, data any, err error)
 	Info(requestId string, checkpoint string, data any, err error)
 	Warning(requestId string, checkpoint string, data any, err error)
@@ -21,12 +20,35 @@ type loggerLevelDefiniton struct {
 	Error   int
 }
 
+var def = loggerLevelDefiniton{
+	Debug: 0, Info: 1, Warning: 2, Error: 3,
+}
+
+func NewDebugLogger() Logger {
+	return &loggerReciverImpl{
+		level:    0,
+		levelDef: def,
+	}
+}
+
 func NewLogger() Logger {
 	return &loggerReciverImpl{
-		level: 1,
-		levelDef: loggerLevelDefiniton{
-			Debug: 0, Info: 1, Warning: 2, Error: 3,
-		},
+		level:    1,
+		levelDef: def,
+	}
+}
+
+func NewWarnLogger() Logger {
+	return &loggerReciverImpl{
+		level:    2,
+		levelDef: def,
+	}
+}
+
+func NewErrorLogger() Logger {
+	return &loggerReciverImpl{
+		level:    3,
+		levelDef: def,
 	}
 }
 
@@ -57,16 +79,6 @@ func (l *loggerReciverImpl) Error(requestId string, checkpoint string, data any,
 	if l.level <= l.levelDef.Error {
 		l.execute("Error", requestId, checkpoint, data, err)
 	}
-}
-
-func (l *loggerReciverImpl) SetLevel(level int) Logger {
-	if level < l.levelDef.Debug {
-		l.level = l.levelDef.Debug
-	} else if level > l.levelDef.Error {
-		l.level = l.levelDef.Error
-	}
-	l.level = level
-	return l
 }
 
 func (l *loggerReciverImpl) getCaller(i int) string {
