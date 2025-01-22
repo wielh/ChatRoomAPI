@@ -18,6 +18,4 @@ gin, postgresql, gorm
 
 + websocket
 
-+ logger
-
 + 拆分成 micro-service

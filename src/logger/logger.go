@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"ChatRoomAPI/src"
 	"fmt"
 	"runtime"
 	"time"
@@ -24,6 +25,19 @@ var def = loggerLevelDefiniton{
 	Debug: 0, Info: 1, Warning: 2, Error: 3,
 }
 
+func NewLogger() Logger {
+	switch src.GlobalConfig.YamlConfig.Log.Level {
+	case "error":
+		return NewErrorLogger()
+	case "warning":
+		return NewWarnLogger()
+	case "debug":
+		return NewDebugLogger()
+	default:
+		return NewInfoLogger()
+	}
+}
+
 func NewDebugLogger() Logger {
 	return &loggerReciverImpl{
 		level:    def.Debug,
@@ -31,7 +45,7 @@ func NewDebugLogger() Logger {
 	}
 }
 
-func NewLogger() Logger {
+func NewInfoLogger() Logger {
 	return &loggerReciverImpl{
 		level:    def.Info,
 		levelDef: def,

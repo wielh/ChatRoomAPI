@@ -26,6 +26,11 @@ type config struct {
 		DBName     string `yaml:"name"`
 		Port       int32  `yaml:"port"`
 	} `yaml:"database"`
+	Log struct {
+		Level string `yaml:"level"`
+	} `yaml:"log"`
+	Redis struct {
+	} `yaml:"redis"`
 }
 
 type allConfigs struct {
@@ -53,7 +58,7 @@ func NewGlobalConfig() error {
 			return
 		}
 
-		err = GlobalConfig.dbInit()
+		err = GlobalConfig.postgreInit()
 		if err != nil {
 			return
 		}
@@ -77,7 +82,7 @@ func (a *allConfigs) yamlInit() error {
 	return err
 }
 
-func (a *allConfigs) dbInit() error {
+func (a *allConfigs) postgreInit() error {
 	d := a.YamlConfig.Database
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", d.Host, d.DBUser, d.DBPassword, d.DBName, d.Port) // pg only
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
