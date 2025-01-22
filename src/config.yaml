@@ -1,12 +1,30 @@
 server:
   host: "localhost"
   port: 8081
-  session_encrypt_key: ${session_encrypt_key}
+  session_encrypt_key: 'aaaaaaa'
+  rate_limit:
+    all: 
+      second: 1
+      max_request: 1000
+    ip:
+      second: 1
+      max_request: 20
+    repeat: 
+      second: 3
+      max_request: 1
 database:
   host: "localhost"
   user: "postgres"
-  password: ${password}
+  password: root
   name: "ginExample"
   port: 5432
+redis:
+  address: "localhost:6379"
+  password: ""
+  db: 0
+  max_connection: 30
+  min_connection: 5
 logger:
   level: "info"
+
+  

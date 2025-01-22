@@ -13,20 +13,33 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-contrib/timeout"
 	"github.com/gin-gonic/gin"
-	limit "github.com/yangxikun/gin-limit-by-key"
-	"golang.org/x/time/rate"
 )
 
 func commonMiddleware(g *gin.RouterGroup) {
 	NewLoginFilter()
+	coustomAllLimiter := newRateLimiter(
+		1000, 1, func(c *gin.Context) string {
+			return "<<<ALL>>>"
+		},
+	)
+	coustomIPLimiter := newRateLimiter(
+		20, 1, func(c *gin.Context) string {
+			return c.ClientIP()
+		},
+	)
+	customRepeatedLimiter := newRateLimiter(
+		1, 3, func(c *gin.Context) string {
+			return fmt.Sprintf("%s::%s", c.ClientIP(), c.Request.URL)
+		},
+	)
 	g.Use(
-		customRepeatedLimiter(),
-		customIPLimiter(),
-		customAllLimiter(),
+		customRepeatedLimiter,
+		coustomIPLimiter,
+		coustomAllLimiter,
+		customTimeout(),
 		customRequestUUIDGenerator(),
 		customLogger(),
 		customRecovery(),
-		customTimeout(),
 		readLoginSession,
 	)
 }
@@ -85,34 +98,31 @@ func customRequestUUIDGenerator() gin.HandlerFunc {
 	}
 }
 
-func customAllLimiter() gin.HandlerFunc {
-	return limit.NewRateLimiter(func(c *gin.Context) string {
-		return "<<<ALL>>>"
-	}, func(c *gin.Context) (*rate.Limiter, time.Duration) {
-		return rate.NewLimiter(rate.Every(time.Second), 1000), time.Hour
-	}, func(c *gin.Context) {
-		c.AbortWithStatus(429)
-	})
-}
+func newRateLimiter(maxRequests int, windowSeconds int, keyGenerator func(*gin.Context) string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		redisKey := keyGenerator(c)
+		rdb := src.GlobalConfig.Redis
 
-func customIPLimiter() gin.HandlerFunc {
-	return limit.NewRateLimiter(func(c *gin.Context) string {
-		return c.ClientIP()
-	}, func(c *gin.Context) (*rate.Limiter, time.Duration) {
-		return rate.NewLimiter(rate.Every(time.Second), 20), time.Hour
-	}, func(c *gin.Context) {
-		c.AbortWithStatus(429)
-	})
-}
+		currentCount, err := rdb.Incr(c, redisKey).Result()
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+			return
+		}
 
-func customRepeatedLimiter() gin.HandlerFunc {
-	return limit.NewRateLimiter(func(c *gin.Context) string {
-		return fmt.Sprintf("%s::%s", c.ClientIP(), c.Request.URL)
-	}, func(c *gin.Context) (*rate.Limiter, time.Duration) {
-		return rate.NewLimiter(rate.Every(time.Second), 2), time.Hour
-	}, func(c *gin.Context) {
-		c.AbortWithStatus(429)
-	})
+		if currentCount == 1 {
+			err = rdb.Expire(c, redisKey, time.Duration(windowSeconds)*time.Second).Err()
+			if err != nil {
+				c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+				return
+			}
+		}
+
+		if int(currentCount) > maxRequests {
+			c.AbortWithStatus(429)
+			return
+		}
+		c.Next()
+	}
 }
 
 func customLogger() gin.HandlerFunc {
