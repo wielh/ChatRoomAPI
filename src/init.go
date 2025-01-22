@@ -1,6 +1,7 @@
 package src
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -8,6 +9,7 @@ import (
 
 	"sync"
 
+	"github.com/go-redis/redis/v8"
 	"gopkg.in/yaml.v2"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -30,26 +32,32 @@ type config struct {
 		Level string `yaml:"level"`
 	} `yaml:"log"`
 	Redis struct {
+		Address      string `yaml:"address"`
+		Password     string `yaml:"password"`
+		DBNumber     int    `yaml:"db"`
+		PoolSize     int    `yaml:"max_connection"`
+		MinIdleConns int    `yaml:"min_connection"`
 	} `yaml:"redis"`
 }
 
 type allConfigs struct {
 	YamlConfig config
 	DB         *gorm.DB
+	Redis      *redis.Client
 }
 
 var GlobalConfig allConfigs
 var once sync.Once
 
 func init() {
-	err := NewGlobalConfig()
+	err := newGlobalConfig()
 	if err != nil {
 		fmt.Println("error while app init")
 		panic(err)
 	}
 }
 
-func NewGlobalConfig() error {
+func newGlobalConfig() error {
 	var err error
 	once.Do(func() {
 		GlobalConfig = allConfigs{}
@@ -63,6 +71,10 @@ func NewGlobalConfig() error {
 			return
 		}
 
+		err = GlobalConfig.redisInit()
+		if err != nil {
+			return
+		}
 	})
 	return err
 }
@@ -94,11 +106,28 @@ func (a *allConfigs) postgreInit() error {
 	if err != nil {
 		return err
 	}
-
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(50)
 	sqlDB.SetConnMaxLifetime(30 * time.Minute)
 	a.DB = db
+	return nil
+}
+
+func (a *allConfigs) redisInit() error {
+	r := a.YamlConfig.Redis
+	rdb := redis.NewClient(&redis.Options{
+		Addr:         r.Address,
+		Password:     r.Password,
+		DB:           r.DBNumber,
+		PoolSize:     r.PoolSize,
+		MinIdleConns: r.MinIdleConns,
+	})
+
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+		return err
+	}
+	a.Redis = rdb
 	return nil
 }
 
