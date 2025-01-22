@@ -9,6 +9,8 @@ import (
 
 	"sync"
 
+	"github.com/gin-contrib/sessions"
+	redisStore "github.com/gin-contrib/sessions/redis"
 	"github.com/go-redis/redis/v8"
 	"gopkg.in/yaml.v2"
 	"gorm.io/driver/postgres"
@@ -17,9 +19,28 @@ import (
 
 type config struct {
 	Server struct {
-		Host              string `yaml:"host"`
-		Port              int    `yaml:"port"`
-		SessionEncryptKey string `yaml:"session_encrypt_key"`
+		Host    string `yaml:"host"`
+		Port    int    `yaml:"port"`
+		Session struct {
+			SecretKey string `yaml:"secret_key"`
+			Age       int    `yaml:"age_second"`
+			HttpOnly  bool   `yaml:"http_only"`
+			Secure    bool   `yaml:"secure"`
+		} `yaml:"session"`
+		RateLimitConfig struct {
+			All struct {
+				Second     int `yaml:"second"`
+				MaxRequest int `yaml:"max_request"`
+			} `yaml:"all"`
+			IP struct {
+				Second     int `yaml:"second"`
+				MaxRequest int `yaml:"max_request"`
+			} `yaml:"ip"`
+			Repeat struct {
+				Second     int `yaml:"second"`
+				MaxRequest int `yaml:"max_request"`
+			} `yaml:"repeat"`
+		} `yaml:"rate_limit"`
 	} `yaml:"server"`
 	Database struct {
 		Host       string `yaml:"host"`
@@ -41,9 +62,10 @@ type config struct {
 }
 
 type allConfigs struct {
-	YamlConfig config
-	DB         *gorm.DB
-	Redis      *redis.Client
+	YamlConfig   config
+	DB           *gorm.DB
+	Redis        *redis.Client
+	RedisSession *redisStore.Store
 }
 
 var GlobalConfig allConfigs
@@ -115,6 +137,7 @@ func (a *allConfigs) postgreInit() error {
 
 func (a *allConfigs) redisInit() error {
 	r := a.YamlConfig.Redis
+	s := a.YamlConfig.Server.Session
 	rdb := redis.NewClient(&redis.Options{
 		Addr:         r.Address,
 		Password:     r.Password,
@@ -128,6 +151,20 @@ func (a *allConfigs) redisInit() error {
 		return err
 	}
 	a.Redis = rdb
+
+	store, err := redisStore.NewStore(r.PoolSize, "tcp", r.Address, r.Password, []byte(s.SecretKey))
+	if err != nil {
+		log.Fatalf("Failed to connect to Redis: %v", err)
+		return err
+	}
+	store.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   s.Age,
+		HttpOnly: s.HttpOnly,
+		Secure:   s.Secure,
+	})
+
+	a.RedisSession = &store
 	return nil
 }
 
