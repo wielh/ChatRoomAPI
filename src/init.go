@@ -48,6 +48,7 @@ type config struct {
 		DBPassword string `yaml:"password"`
 		DBName     string `yaml:"name"`
 		Port       int32  `yaml:"port"`
+		SSLMode    string `yaml:"sslmode"`
 	} `yaml:"database"`
 	Log struct {
 		Level string `yaml:"level"`
@@ -118,7 +119,20 @@ func (a *allConfigs) yamlInit() error {
 
 func (a *allConfigs) postgreInit() error {
 	d := a.YamlConfig.Database
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%d sslmode=disable", d.Host, d.DBUser, d.DBPassword, d.DBName, d.Port) // pg only
+	sslMode := ""
+	if d.SSLMode != "" {
+		sslMode += fmt.Sprintf(" sslmode=%s", d.SSLMode)
+	}
+
+	dbName := ""
+	if d.DBName != "" {
+		dbName += fmt.Sprintf(" dbname=%s", d.DBName)
+	}
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s %s port=%d %s",
+		d.Host, d.DBUser, d.DBPassword, dbName, d.Port, sslMode,
+	)
+
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatal("failed to connect to the database", dsn, err)
