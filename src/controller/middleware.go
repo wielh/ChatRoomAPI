@@ -172,8 +172,9 @@ func customRecovery() gin.HandlerFunc {
 }
 
 func customTimeout() gin.HandlerFunc {
+	timeoutSecond := time.Duration(src.GlobalConfig.YamlConfig.Server.Timeout)
 	return timeout.New(
-		timeout.WithTimeout(5000*time.Millisecond),
+		timeout.WithTimeout(timeoutSecond*time.Millisecond),
 		timeout.WithHandler(func(c *gin.Context) {
 			c.Next()
 		}),

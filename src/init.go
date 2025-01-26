@@ -21,6 +21,7 @@ type config struct {
 	Server struct {
 		Host    string `yaml:"host"`
 		Port    int    `yaml:"port"`
+		Timeout int    `yaml:"timeout_second"`
 		Session struct {
 			SecretKey string `yaml:"secret_key"`
 			Age       int    `yaml:"age_second"`

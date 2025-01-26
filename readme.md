@@ -12,7 +12,7 @@
 
 ## 用到的技術
 
-gin, postgresql, gorm
+gin, gorm, postgresql(本地或aws-rdb), redis
 
 ## TODO 
 
