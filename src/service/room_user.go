@@ -101,7 +101,8 @@ func (r *roomUserServiceImpl) FetchInvitationsByUser(ctx context.Context, req *d
 	r.logger.Info(requestId, "start", req, nil)
 	defer func() { r.logger.Info(requestId, "end", req, nil) }()
 
-	records, err := r.invitationRepo.FetchInvitationsByUser(ctx, req.UserID)
+	skip, pageSize := GetSkip(int(req.Page), int(req.PageSize))
+	records, err := r.invitationRepo.FetchInvitationsByUser(ctx, req.UserID, skip, pageSize)
 	if err != nil {
 		r.logger.Error(requestId, "r.invitationRepo.FetchInvitationsByUser", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)
@@ -212,7 +213,8 @@ func (r *roomUserServiceImpl) FetchApplicationByUser(ctx context.Context, req *d
 	r.logger.Info(requestId, "start", req, nil)
 	defer func() { r.logger.Info(requestId, "end", req, nil) }()
 
-	records, err := r.applicationRepo.FetchApplicationsByUser(ctx, req.UserID)
+	skip, pageSize := GetSkip(int(req.Page), int(req.PageSize))
+	records, err := r.applicationRepo.FetchApplicationsByUser(ctx, req.UserID, skip, pageSize)
 	if err != nil {
 		r.logger.Error(requestId, "r.applicationRepo.FetchApplicationsByUser", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)

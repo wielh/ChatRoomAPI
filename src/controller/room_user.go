@@ -59,6 +59,12 @@ func (r *roomUserControllerImpl) InvitationConfrim(c *gin.Context) {
 
 func (r *roomUserControllerImpl) FetchInvitations(c *gin.Context) {
 	req := dto.FetchInvitationByUserRequest{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		serviceErr := r.errWarpper.NewParseJsonFailedServiceError(err)
+		c.JSON(serviceErr.ToJsonResponse())
+		return
+	}
+
 	_, userId, _ := GetSessionValue(c)
 	req.UserID = userId
 
@@ -110,6 +116,12 @@ func (r *roomUserControllerImpl) DeleteApplication(c *gin.Context) {
 
 func (r *roomUserControllerImpl) FetchApplications(c *gin.Context) {
 	req := dto.FetchApplicationByUserRequest{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		serviceErr := r.errWarpper.NewParseJsonFailedServiceError(err)
+		c.JSON(serviceErr.ToJsonResponse())
+		return
+	}
+
 	_, userId, _ := GetSessionValue(c)
 	req.UserID = userId
 	res, serviceErr := service.GetRoomUserService().FetchApplicationByUser(c, &req)

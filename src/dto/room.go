@@ -11,7 +11,9 @@ type CreateRoomResponse struct {
 }
 
 type GetAvailbleRoomsRequest struct {
-	UserID uint64
+	UserID   uint64
+	Page     uint32 `form:"page" binding:"required,gte=1"`
+	PageSize uint32 `form:"page_size" binding:"required,gte=1"`
 }
 
 type GetAvailbleRoomsResponse struct {

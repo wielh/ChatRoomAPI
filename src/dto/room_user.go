@@ -1,29 +1,5 @@
 package dto
 
-type AdminChangeRequest struct {
-	RoomID      uint64 `json:"room_id" binding:"required"`
-	AdminUserID uint64
-	UserID      uint64 `json:"user_id" binding:"required"`
-}
-
-type AdminChangeResponse struct{}
-
-type InviteNewUserRequest struct {
-	RoomID      uint64 `json:"room_id" binding:"required"`
-	AdminUserID uint64
-	UserID      uint64 `json:"user_id" binding:"required"`
-}
-
-type InviteNewUserResponse struct{}
-
-type InviteNewUserCancelRequest struct {
-	RoomID      uint64 `json:"room_id" binding:"required"`
-	AdminUserID uint64
-	UserID      uint64 `json:"user_id" binding:"required"`
-}
-
-type InviteNewUserCancelResponse struct{}
-
 type ConfrimInviteRequest struct {
 	RoomID  uint64 `json:"room_id" binding:"required"`
 	UserID  uint64
@@ -46,18 +22,10 @@ type RoomInfo struct {
 	Description string   `json:"description" binding:"required"`
 }
 
-type FetchInvitationByAdminRequest struct {
-	AdminID uint64
-	RoomID  uint64 `json:"room_id" binding:"required"`
-}
-
-type FetchInvitationByAdminResponse struct {
-	RoomID    uint64     `json:"room_id" binding:"required"`
-	UserInfos []UserInfo `json:"uesr_info" binding:"required"`
-}
-
 type FetchInvitationByUserRequest struct {
-	UserID uint64
+	UserID   uint64
+	Page     uint32 `form:"page" binding:"required,gte=1"`
+	PageSize uint32 `form:"page_size" binding:"required,gte=1"`
 }
 
 type FetchInvitationByUserResponse struct {
@@ -79,40 +47,13 @@ type RoomJoinApplyCancelRequest struct {
 
 type RoomJoinApplyCancelResponse struct{}
 
-type ConfrimApplyRequest struct {
-	RoomID      uint64 `json:"room_id" binding:"required"`
-	AdminUserID uint64
-	UserID      uint64 `json:"user_id" binding:"required"`
-	Allowed     bool   `json:"allow" binding:"required"`
-}
-
-type ConfrimApplyResponse struct {
-}
-
-type FetchApplicationByAdminRequest struct {
-	RoomID      uint64 `json:"room_id" binding:"required"`
-	AdminUserID uint64
-}
-
-type FetchApplicationByAdminResponse struct {
-	RoomID    uint64     `json:"room_id" binding:"required"`
-	UserInfos []UserInfo `json:"user_infos" binding:"required"`
-}
-
 type FetchApplicationByUserRequest struct {
-	UserID uint64
+	UserID   uint64
+	Page     uint32 `form:"page" binding:"required,gte=1"`
+	PageSize uint32 `form:"page_size" binding:"required,gte=1"`
 }
 
 type FetchApplicationByUserResponse struct {
 	UserID    uint64     `json:"user_id" binding:"required"`
 	RoomInfos []RoomInfo `json:"room_infos" binding:"required"`
-}
-
-type DeleteUserRequest struct {
-	RoomID      uint64 `json:"room_id" binding:"required"`
-	AdminUserID uint64
-	UserID      uint64 `json:"user_id" binding:"required"`
-}
-
-type DeleteUserResponse struct {
 }

@@ -10,11 +10,11 @@ import (
 )
 
 type ApplicationJoinRoomRepository interface {
-	FetchApplicationsByAdmin(ctx context.Context, roomID uint64) (record []*model.UserJoinApplyRecord, err error)
+	FetchApplicationsByAdmin(ctx context.Context, roomID uint64, skip int, pageSize int) (record []*model.UserJoinApplyRecord, err error)
 }
 
 type ApplicationJoinUserRepository interface {
-	FetchApplicationsByUser(ctx context.Context, userID uint64) (record []*model.RoomJoinApplyRecord, err error)
+	FetchApplicationsByUser(ctx context.Context, userID uint64, skip int, pageSize int) (record []*model.RoomJoinApplyRecord, err error)
 }
 
 type ApplicationBaseRepository interface {
@@ -43,7 +43,7 @@ func GetApplicationRepository() ApplicationRepository {
 	return apply
 }
 
-func (a *applicationRepositoryImpl) FetchApplicationsByAdmin(ctx context.Context, roomID uint64) (records []*model.UserJoinApplyRecord, err error) {
+func (a *applicationRepositoryImpl) FetchApplicationsByAdmin(ctx context.Context, roomID uint64, skip int, pageSize int) (records []*model.UserJoinApplyRecord, err error) {
 	tx := GetTxContext(ctx, a.DB)
 	result := tx.Table("apply_records").
 		Select(`apply_records."id" as id, 
@@ -51,11 +51,13 @@ func (a *applicationRepositoryImpl) FetchApplicationsByAdmin(ctx context.Context
 				users."name" as name, 
 				users."email" as email`).
 		Joins(`inner join users on apply_records.users_id = users."id"`).
-		Where(`apply_records.room_id=?`, roomID).Scan(records)
+		Where(`apply_records.room_id=?`, roomID).
+		Order("id DESC").Offset(skip).Limit(pageSize).
+		Scan(records)
 	return records, result.Error
 }
 
-func (a *applicationRepositoryImpl) FetchApplicationsByUser(ctx context.Context, userID uint64) (records []*model.RoomJoinApplyRecord, err error) {
+func (a *applicationRepositoryImpl) FetchApplicationsByUser(ctx context.Context, userID uint64, skip int, pageSize int) (records []*model.RoomJoinApplyRecord, err error) {
 	tx := GetTxContext(ctx, a.DB)
 	result := tx.Table("apply_records").
 		Select(`apply_records."id" as id, 
@@ -65,7 +67,9 @@ func (a *applicationRepositoryImpl) FetchApplicationsByUser(ctx context.Context,
 				rooms.user_ids as user_ids,
 				rooms.description`).
 		Joins(`inner join rooms on apply_records.room_id = rooms."id"`).
-		Where(`apply_records.user_id=?`, userID).Scan(&records)
+		Where(`apply_records.user_id=?`, userID).
+		Order("id DESC").Offset(skip).Limit(pageSize).
+		Scan(&records)
 	return records, result.Error
 }
 

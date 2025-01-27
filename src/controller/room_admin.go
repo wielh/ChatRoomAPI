@@ -5,7 +5,6 @@ import (
 	"ChatRoomAPI/src/dtoError"
 	"ChatRoomAPI/src/service"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -103,8 +102,16 @@ func (r *roomAdminControllerImpl) DeleteInvitation(c *gin.Context) {
 }
 
 func (r *roomAdminControllerImpl) FetchInvitations(c *gin.Context) {
+	req := dto.FetchInvitationByAdminRequest{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		serviceErr := r.errWarpper.NewParseJsonFailedServiceError(err)
+		c.JSON(serviceErr.ToJsonResponse())
+		return
+	}
+
 	_, userId, _ := GetSessionValue(c)
-	req := dto.FetchInvitationByAdminRequest{AdminID: userId}
+	req.AdminID = userId
+
 	res, serviceErr := service.GetRoomAdminService().FetchInvitationsByAdmin(c, &req)
 	if serviceErr != nil {
 		c.JSON(serviceErr.ToJsonResponse())
@@ -134,16 +141,15 @@ func (r *roomAdminControllerImpl) ConfrimApplication(c *gin.Context) {
 }
 
 func (r *roomAdminControllerImpl) FetchApplications(c *gin.Context) {
-	_, userId, _ := GetSessionValue(c)
-	roomIDStr := c.Query("room_id")
-	roomID, err := strconv.ParseUint(roomIDStr, 10, 64)
-	if err != nil {
-		serviceErr := r.errWarpper.NewParseFormatFailedServiceError(err, "invaild roomId")
+	req := dto.FetchApplicationByAdminRequest{}
+	if err := c.ShouldBindQuery(&req); err != nil {
+		serviceErr := r.errWarpper.NewParseJsonFailedServiceError(err)
 		c.JSON(serviceErr.ToJsonResponse())
 		return
 	}
+	_, userId, _ := GetSessionValue(c)
+	req.AdminUserID = userId
 
-	req := dto.FetchApplicationByAdminRequest{AdminUserID: userId, RoomID: roomID}
 	res, serviceErr := service.GetRoomAdminService().FetchApplicationByAdmin(c, &req)
 	if serviceErr != nil {
 		c.JSON(serviceErr.ToJsonResponse())

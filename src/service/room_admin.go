@@ -238,7 +238,8 @@ func (r *roomAdminServiceImpl) FetchInvitationsByAdmin(ctx context.Context, req 
 		return nil, r.errWarpper.NewNotAdminOfRoomError(req.AdminID, req.RoomID)
 	}
 
-	records, err := r.invitationRepo.FetchInvitationsByAdmin(txContext, req.AdminID)
+	skip, pageSize := GetSkip(int(req.Page), int(req.PageSize))
+	records, err := r.invitationRepo.FetchInvitationsByAdmin(txContext, req.AdminID, skip, pageSize)
 	if err != nil {
 		r.logger.Error(requestId, "r.invitationRepo.FetchInvitationsByAdmin", req, err)
 		tx.Rollback()
@@ -352,7 +353,8 @@ func (r *roomAdminServiceImpl) FetchApplicationByAdmin(ctx context.Context, req 
 		return nil, r.errWarpper.NewNotAdminOfRoomError(req.AdminUserID, req.RoomID)
 	}
 
-	records, err := r.applicationRepo.FetchApplicationsByAdmin(txContext, req.RoomID)
+	skip, pageSize := GetSkip(int(req.Page), int(req.PageSize))
+	records, err := r.applicationRepo.FetchApplicationsByAdmin(txContext, req.RoomID, skip, pageSize)
 	if err != nil {
 		tx.Rollback()
 		r.logger.Error(requestId, "r.applicationRepo.FetchApplicationsByAdmin", req, err)

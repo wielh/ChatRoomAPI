@@ -14,7 +14,7 @@ type RoomRepository interface {
 	CreateRoom(ctx context.Context, adminUserID uint64, roomName string, description string) (room *model.Room, roomNameUsed bool, err error)
 	RoomExist(ctx context.Context, roomID uint64) (bool, error)
 	ReadRoomInfo(ctx context.Context, roomID uint64) (*model.Room, error)
-	GetAvailbleRooms(ctx context.Context, userID uint64) ([]*model.Room, error)
+	GetAvailbleRooms(ctx context.Context, userID uint64, page int, pageSize int) ([]*model.Room, error)
 	DeleteRoom(ctx context.Context, roomID uint64, adminUserID uint64) (ok bool, err error)
 
 	AddUser(ctx context.Context, roomID uint64, userID uint64) (ok bool, err error)
@@ -79,10 +79,13 @@ func (r *roomRepositoryImpl) ReadRoomInfo(ctx context.Context, roomID uint64) (*
 	return &roomInfo, nil
 }
 
-func (r *roomRepositoryImpl) GetAvailbleRooms(ctx context.Context, userID uint64) ([]*model.Room, error) {
+func (r *roomRepositoryImpl) GetAvailbleRooms(ctx context.Context, userID uint64, page int, pageSize int) ([]*model.Room, error) {
 	tx := GetTxContext(ctx, r.DB)
 	roomsInfo := []*model.Room{}
-	result := tx.Select("id", "name", "admin_user_id", "user_ids", "description").Where("? = ANY (user_ids)", userID).Find(&roomsInfo)
+	result := tx.
+		Select("id", "name", "admin_user_id", "user_ids", "description").
+		Where("? = ANY (user_ids)", userID).
+		Order("id DESC").Offset(page).Limit(pageSize).Find(&roomsInfo)
 	return roomsInfo, result.Error
 }
 

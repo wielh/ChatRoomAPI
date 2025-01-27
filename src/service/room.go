@@ -56,7 +56,8 @@ func (r *roomServiceImpl) GetAvailbleRooms(ctx context.Context, req *dto.GetAvai
 	r.logger.Info(requestId, "start", req, nil)
 	defer func() { r.logger.Info(requestId, "end", req, nil) }()
 
-	roomsInfo, err := r.roomRepo.GetAvailbleRooms(ctx, req.UserID)
+	skip, pageSize := GetSkip(int(req.Page), int(req.PageSize))
+	roomsInfo, err := r.roomRepo.GetAvailbleRooms(ctx, req.UserID, skip, pageSize)
 	if err != nil {
 		r.logger.Error(requestId, "r.roomRepo.GetAvailbleRooms", req, err)
 		return nil, r.errWarpper.NewDBServiceError(err)

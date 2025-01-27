@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"ChatRoomAPI/src"
 	"ChatRoomAPI/src/common"
 	"ChatRoomAPI/src/dto"
 	"ChatRoomAPI/src/dtoError"
@@ -26,7 +25,6 @@ var message MessageGroupController
 
 func init() {
 	message = &messageGroupControllerImpl{
-		pageSize:  int32(src.GlobalConfig.YamlConfig.Server.PageSize),
 		errWarper: dtoError.GetServiceErrorWarpper(),
 	}
 }

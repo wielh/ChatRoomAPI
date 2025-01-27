@@ -10,11 +10,11 @@ import (
 )
 
 type InvitationJoinRoomRepository interface {
-	FetchInvitationsByAdmin(ctx context.Context, roomID uint64) (invitations []*model.UserJoinInviteRecord, err error)
+	FetchInvitationsByAdmin(ctx context.Context, roomID uint64, skip int, pageSize int) (invitations []*model.UserJoinInviteRecord, err error)
 }
 
 type InvitationJoinUserRepository interface {
-	FetchInvitationsByUser(ctx context.Context, userID uint64) (invitations []*model.RoomJoinInviteRecord, err error)
+	FetchInvitationsByUser(ctx context.Context, userID uint64, skip int, pageSize int) (invitations []*model.RoomJoinInviteRecord, err error)
 }
 
 type InvitationBaseRepository interface {
@@ -43,7 +43,7 @@ func GetInvitationRepository() InvitationRepository {
 	return invite
 }
 
-func (i *invitationRepositoryImpl) FetchInvitationsByAdmin(ctx context.Context, roomID uint64) (invitations []*model.UserJoinInviteRecord, err error) {
+func (i *invitationRepositoryImpl) FetchInvitationsByAdmin(ctx context.Context, roomID uint64, skip int, pageSize int) (invitations []*model.UserJoinInviteRecord, err error) {
 	tx := GetTxContext(ctx, i.DB)
 	result := tx.Table("invite_records").
 		Select(`invite_records."id" as id, 
@@ -51,11 +51,13 @@ func (i *invitationRepositoryImpl) FetchInvitationsByAdmin(ctx context.Context, 
 				users."name" as name, 
 				users."email" as email`).
 		Joins(`inner join users on invite_records.users_id = users."id"`).
-		Where(`invite_records.room_id=?`, roomID).Scan(invitations)
+		Where(`invite_records.room_id=?`, roomID).
+		Order("id DESC").Offset(skip).Limit(pageSize).
+		Scan(invitations)
 	return invitations, result.Error
 }
 
-func (i *invitationRepositoryImpl) FetchInvitationsByUser(ctx context.Context, userID uint64) (invitations []*model.RoomJoinInviteRecord, err error) {
+func (i *invitationRepositoryImpl) FetchInvitationsByUser(ctx context.Context, userID uint64, skip int, pageSize int) (invitations []*model.RoomJoinInviteRecord, err error) {
 	tx := GetTxContext(ctx, i.DB)
 	result := tx.Table("invite_records").
 		Select(`invite_records.id as id, 
@@ -65,7 +67,9 @@ func (i *invitationRepositoryImpl) FetchInvitationsByUser(ctx context.Context, u
 				rooms.user_ids as user_ids,
 				rooms.description`).
 		Joins(`inner join rooms on invite_records.room_id = rooms.id`).
-		Where(`invite_records.user_id=?`, userID).Scan(&invitations)
+		Where(`invite_records.user_id=?`, userID).
+		Order("id DESC").Offset(skip).Limit(pageSize).
+		Scan(&invitations)
 	return invitations, result.Error
 }
 
