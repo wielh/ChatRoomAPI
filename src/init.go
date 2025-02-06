@@ -85,16 +85,19 @@ func newGlobalConfig() error {
 	var err error
 	once.Do(func() {
 		GlobalConfig = allConfigs{}
+		fmt.Println("load yaml file as config ...")
 		err = GlobalConfig.yamlInit()
 		if err != nil {
 			return
 		}
 
+		fmt.Println("pg connection init...")
 		err = GlobalConfig.postgreInit()
 		if err != nil {
 			return
 		}
 
+		fmt.Println("redis connection init...")
 		err = GlobalConfig.redisInit()
 		if err != nil {
 			return
