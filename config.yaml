@@ -1,8 +1,9 @@
 server:
   host: "localhost"
   port: 8081
+  timeout_second: 5
   session: 
-    secret_key: ${...}
+    secret_key: abcdefg
     age_second: 86400
     http_only: true
     secure: false
@@ -19,12 +20,13 @@ server:
 database:
   host: "localhost"
   user: "postgres"
-  password:  ${...}
+  password: "..."
   name: "ginExample"
   port: 5432
+  sslmode: disable
 redis:
   address: "localhost:6379"
-  password: ${...}
+  password: "..."
   db: 0
   max_connection: 30
   min_connection: 5
