@@ -12,7 +12,7 @@ import (
 
 func roomGroupRouter(g *gin.RouterGroup) {
 	group := g.Group("/room")
-	group.Use(NewLoginFilter())
+	group.Use(GetLoginFilter())
 
 	group.PUT("/", room.CreateRoom)
 	group.GET("/", room.GetAvailbleRooms)

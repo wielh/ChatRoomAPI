@@ -24,8 +24,8 @@ database:
   port: 5432
   sslmode: ""
 redis:
-  address: "..."
-  password: ""
+  address: "localhost:6379"
+  password: "..."
   db: 0
   max_connection: 30
   min_connection: 5

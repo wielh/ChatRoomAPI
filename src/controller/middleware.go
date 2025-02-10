@@ -15,7 +15,7 @@ import (
 )
 
 func commonMiddleware(g *gin.RouterGroup) {
-	NewLoginFilter()
+	GetLoginFilter()
 	rateLimit := src.GlobalConfig.YamlConfig.Server.RateLimitConfig
 	coustomAllLimiter := newRateLimiter(
 		rateLimit.All.MaxRequest, rateLimit.All.Second, func(c *gin.Context) string {
@@ -51,7 +51,7 @@ var loginFilter func(*gin.Context)
 var log = logger.NewLogger()
 var once sync.Once
 
-func NewLoginFilter() func(*gin.Context) {
+func GetLoginFilter() func(*gin.Context) {
 	once.Do(func() {
 		readLoginSession = sessions.Sessions("login", *src.GlobalConfig.RedisSession)
 		loginFilter = func(c *gin.Context) {

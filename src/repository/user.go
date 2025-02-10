@@ -72,7 +72,7 @@ func (a *accountRepositoryImpl) SelectUserByName(ctx context.Context, username s
 
 func (a *accountRepositoryImpl) UpdatePassword(ctx context.Context, ID uint64, newHashedPassword string) (bool, error) {
 	tx := GetTxContext(ctx, a.DB)
-	result := tx.Model(&model.User{}).Where("id = ?", ID).Updates(map[string]interface{}{"password": newHashedPassword})
+	result := tx.Model(&model.User{}).Where("id=?", ID).Updates(map[string]interface{}{"password": newHashedPassword})
 	if result.Error != nil {
 		return false, result.Error
 	} else if result.RowsAffected == 0 {

@@ -16,7 +16,7 @@ func userGroupRouter(g *gin.RouterGroup) {
 	group.POST("/register", user.Register)
 	group.POST("/login", user.Login)
 	group.PUT("/reset_password", user.ResetPassword)
-	group.Use(NewLoginFilter())
+	group.Use(GetLoginFilter())
 	group.GET("/info", user.GetUserInfo)
 }
 

@@ -70,7 +70,7 @@ func (m *messageGroupControllerImpl) FetchMessages(c *gin.Context) {
 
 func messageGroupRouter(g *gin.RouterGroup) {
 	group := g.Group("/message")
-	group.Use(NewLoginFilter())
+	group.Use(GetLoginFilter())
 	group.POST("/", message.AddMessage)
 	group.GET("/", message.FetchMessages)
 }
