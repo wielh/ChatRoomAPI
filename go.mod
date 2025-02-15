@@ -12,12 +12,16 @@ require (
 	gorm.io/gorm v1.25.12
 )
 
-require github.com/google/uuid v1.6.0
+require (
+	github.com/google/uuid v1.6.0
+	github.com/rs/zerolog v1.33.0
+)
 
 require (
 	github.com/cespare/xxhash/v2 v2.1.2 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/gomodule/redigo v1.9.2 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/snowdreamtech/redistore v0.0.0-20231007100540-6364ca2c97b4 // indirect
 )
 

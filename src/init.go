@@ -107,7 +107,7 @@ func newGlobalConfig() error {
 }
 
 func (a *allConfigs) yamlInit() error {
-	file, err := os.Open("config-aws-rdb.yaml")
+	file, err := os.Open("config.yaml")
 	if err != nil {
 		log.Fatalf("Error opening file: %v", err)
 		return err
@@ -170,7 +170,7 @@ func (a *allConfigs) redisInit() error {
 	}
 	a.Redis = rdb
 
-	store, err := redisStore.NewStore(r.PoolSize, "tcp", r.Address, r.Password, []byte(s.SecretKey))
+	store, err := redisStore.NewStore(r.PoolSize, "tcp", r.Address, r.Password)
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 		return err
