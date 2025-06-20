@@ -46,6 +46,13 @@ const (
 
 	UserHasApplied = 40000
 	UserNotApply   = 40001
+
+	StickerSetNotExist = 50000
+	StickerAlreadyBuy  = 50001
+
+	UserMoneyNotEnough    = 60000
+	UserNotCharged        = 60001
+	UserChargeMoneyExcess = 60002
 )
 
 type ServiceErrorWarpper interface {
@@ -72,4 +79,11 @@ type ServiceErrorWarpper interface {
 
 	NewUserApplyError(userID uint64, roomID uint64) *ServiceError
 	NewUserNotApplyError(userID uint64, roomID uint64) *ServiceError
+
+	NewStickerSetNotExistError(StickerId uint64) *ServiceError
+	NewStickerAlreadyBuyError(StickerId uint64, userID uint64) *ServiceError
+
+	NewUserMoneyNotEnoughError(userID uint64) *ServiceError
+	NewUserNotChargedError(userID uint64) *ServiceError
+	NewUserChargeMoneyExcessError(userID uint64, charge uint32, min uint32, max uint32) *ServiceError
 }

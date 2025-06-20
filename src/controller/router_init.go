@@ -9,4 +9,6 @@ func MiddlewareInit(g *gin.RouterGroup) {
 	userGroupRouter(g)
 	roomGroupRouter(g)
 	messageGroupRouter(g)
+	stickerRouter(g)
+	WalletRouter(g)
 }

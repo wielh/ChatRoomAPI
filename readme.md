@@ -18,4 +18,4 @@ gin, gorm, postgresql(本地或aws-rdb), redis
 
 + websocket
 
-+ 拆分成 micro-service
++ 將每個 user 的 sticker 資訊存到 redis

@@ -31,14 +31,16 @@ type RoomController interface {
 }
 
 type roomControllerImpl struct {
-	errWarper dtoError.ServiceErrorWarpper
+	errWarper   dtoError.ServiceErrorWarpper
+	roomService service.RoomService
 }
 
 var room RoomController
 
 func init() {
 	room = &roomControllerImpl{
-		errWarper: dtoError.GetServiceErrorWarpper(),
+		errWarper:   dtoError.GetServiceErrorWarpper(),
+		roomService: service.GetRoomService(),
 	}
 }
 
@@ -52,7 +54,7 @@ func (r *roomControllerImpl) CreateRoom(c *gin.Context) {
 
 	_, userId, _ := GetSessionValue(c)
 	req.UserID = userId
-	res, serviceErr := service.GetRoomService().CreateRoom(c, &req)
+	res, serviceErr := r.roomService.CreateRoom(c, &req)
 	if serviceErr != nil {
 		c.JSON(serviceErr.ToJsonResponse())
 		return
@@ -63,7 +65,7 @@ func (r *roomControllerImpl) CreateRoom(c *gin.Context) {
 func (r *roomControllerImpl) GetAvailbleRooms(c *gin.Context) {
 	_, userId, _ := GetSessionValue(c)
 	req := dto.GetAvailbleRoomsRequest{UserID: userId}
-	res, serviceErr := service.GetRoomService().GetAvailbleRooms(c, &req)
+	res, serviceErr := r.roomService.GetAvailbleRooms(c, &req)
 	if serviceErr != nil {
 		c.JSON(serviceErr.ToJsonResponse())
 		return
@@ -83,7 +85,7 @@ func (r *roomControllerImpl) GetRoomInfo(c *gin.Context) {
 	}
 
 	req := dto.ReadRoomInfoRequest{UserID: userId, RoomID: roomID}
-	res, serviceErr := service.GetRoomService().ReadRoomInfo(c, &req)
+	res, serviceErr := r.roomService.ReadRoomInfo(c, &req)
 	if serviceErr != nil {
 		c.JSON(serviceErr.ToJsonResponse())
 		return
@@ -101,7 +103,7 @@ func (r *roomControllerImpl) DeleteRoom(c *gin.Context) {
 
 	_, userId, _ := GetSessionValue(c)
 	req.AdminUserID = userId
-	_, serviceErr := service.GetRoomService().DeleteRoom(c, &req)
+	_, serviceErr := r.roomService.DeleteRoom(c, &req)
 	if serviceErr != nil {
 		c.JSON(serviceErr.ToJsonResponse())
 		return

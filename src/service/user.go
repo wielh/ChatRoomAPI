@@ -31,7 +31,7 @@ func init() {
 	user = &userServiceImpl{
 		accountRepo: repository.GetAccountRepository(),
 		errWarpper:  dtoError.GetServiceErrorWarpper(),
-		logger:      logger.NewLogger(),
+		logger:      logger.NewZeroLogger(),
 	}
 }
 
