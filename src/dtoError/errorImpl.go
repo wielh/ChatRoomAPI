@@ -5,12 +5,62 @@ import (
 	"net/http"
 )
 
-type ServiceErrorWarpperImpl struct{}
-
 var s ServiceErrorWarpper = &ServiceErrorWarpperImpl{}
 
-func GetServiceErrorWarpper() ServiceErrorWarpper {
-	return s
+type ServiceErrorWarpperImpl struct{}
+
+func (s *ServiceErrorWarpperImpl) NewParseQueryFailedServiceError(err error) *ServiceError {
+	return &ServiceError{
+		StatusCode:     http.StatusBadRequest,
+		ErrorCode:      ParseQueryFailed,
+		InternalError:  err,
+		ExtrenalReason: err.Error(),
+	}
+}
+
+func (s *ServiceErrorWarpperImpl) NewUserChargeMoneyExcessError(userID uint64, charge uint32, min uint32, max uint32) *ServiceError {
+	return &ServiceError{
+		StatusCode:     http.StatusBadRequest,
+		ErrorCode:      UserChargeMoneyExcess,
+		InternalError:  nil,
+		ExtrenalReason: fmt.Sprintf("User %d: charge account should be between %d and %d, get %d", userID, min, max, charge),
+	}
+}
+
+func (s *ServiceErrorWarpperImpl) NewUserNotChargedError(userID uint64) *ServiceError {
+	return &ServiceError{
+		StatusCode:     http.StatusPaymentRequired,
+		ErrorCode:      UserNotCharged,
+		InternalError:  nil,
+		ExtrenalReason: fmt.Sprintf("User %d has no charged record", userID),
+	}
+}
+
+func (s *ServiceErrorWarpperImpl) NewStickerAlreadyBuyError(StickerSetId uint64, userID uint64) *ServiceError {
+	return &ServiceError{
+		StatusCode:     http.StatusBadRequest,
+		ErrorCode:      UserMoneyNotEnough,
+		InternalError:  nil,
+		ExtrenalReason: fmt.Sprintf("User %d has already by sticker %d", userID, StickerSetId),
+	}
+}
+
+func (s *ServiceErrorWarpperImpl) NewUserMoneyNotEnoughError(userID uint64) *ServiceError {
+	return &ServiceError{
+		StatusCode:     http.StatusPaymentRequired,
+		ErrorCode:      StickerAlreadyBuy,
+		InternalError:  nil,
+		ExtrenalReason: fmt.Sprintf("User %d does not have enough money", userID),
+	}
+}
+
+func (s *ServiceErrorWarpperImpl) NewStickerSetNotExistError(StickerSetId uint64) *ServiceError {
+	return &ServiceError{
+		StatusCode:     http.StatusNotFound,
+		ErrorCode:      StickerSetNotExist,
+		InternalError:  nil,
+		ExtrenalReason: fmt.Sprintf("StickerSet %d does not exist", StickerSetId),
+	}
 }
 
 func (s *ServiceErrorWarpperImpl) NewLoginFailedServiceError(err error) *ServiceError {
@@ -182,4 +232,8 @@ func (s *ServiceErrorWarpperImpl) NewUserNotExist(Id uint64) *ServiceError {
 		InternalError:  nil,
 		ExtrenalReason: fmt.Sprintf("user %d does not exist", Id),
 	}
+}
+
+func GetServiceErrorWarpper() ServiceErrorWarpper {
+	return s
 }

@@ -76,10 +76,12 @@ func (u *UserControllerImpl) Login(c *gin.Context) {
 		return
 	}
 
-	SetSessionValue(c, res.ID, res.Username)
-	c.JSON(http.StatusOK, gin.H{
-		"errorCode": dtoError.Success,
-	})
+	_, err := SetSessionValue(c, res.ID, res.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{})
 }
 
 func (u *UserControllerImpl) ResetPassword(c *gin.Context) {

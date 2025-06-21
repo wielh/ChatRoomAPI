@@ -67,7 +67,7 @@ type allConfigs struct {
 	YamlConfig   config
 	DB           *gorm.DB
 	Redis        *redis.Client
-	RedisSession *redisStore.Store
+	RedisSession redisStore.Store
 }
 
 var GlobalConfig allConfigs
@@ -102,6 +102,8 @@ func newGlobalConfig() error {
 		if err != nil {
 			return
 		}
+
+		fmt.Println("Init done")
 	})
 	return err
 }
@@ -170,7 +172,7 @@ func (a *allConfigs) redisInit() error {
 	}
 	a.Redis = rdb
 
-	store, err := redisStore.NewStore(r.PoolSize, "tcp", r.Address, r.Password)
+	store, err := redisStore.NewStore(r.PoolSize, "tcp", r.Address, r.Password, []byte(s.SecretKey))
 	if err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 		return err
@@ -182,7 +184,7 @@ func (a *allConfigs) redisInit() error {
 		Secure:   s.Secure,
 	})
 
-	a.RedisSession = &store
+	a.RedisSession = store
 	return nil
 }
 

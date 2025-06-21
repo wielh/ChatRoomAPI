@@ -30,6 +30,7 @@ const (
 	LoginFailed         = 6
 	ResetPasswordFailed = 7
 	UserNotExist        = 8
+	ParseQueryFailed    = 9
 
 	DBError          = 10000
 	DBNoRowAffected  = 10001
@@ -46,6 +47,13 @@ const (
 
 	UserHasApplied = 40000
 	UserNotApply   = 40001
+
+	StickerSetNotExist = 50000
+	StickerAlreadyBuy  = 50001
+
+	UserMoneyNotEnough    = 60000
+	UserNotCharged        = 60001
+	UserChargeMoneyExcess = 60002
 )
 
 type ServiceErrorWarpper interface {
@@ -56,6 +64,7 @@ type ServiceErrorWarpper interface {
 	NewUserHasRegisterdError(username string) *ServiceError
 	NewUsernameExist(username string) *ServiceError
 	NewUserNotExist(Id uint64) *ServiceError
+	NewParseQueryFailedServiceError(err error) *ServiceError // use for err=c.ShouldBindQuery(&req) only
 
 	NewDBServiceError(err error) *ServiceError
 	NewDBNoAffectedServiceError() *ServiceError
@@ -72,4 +81,11 @@ type ServiceErrorWarpper interface {
 
 	NewUserApplyError(userID uint64, roomID uint64) *ServiceError
 	NewUserNotApplyError(userID uint64, roomID uint64) *ServiceError
+
+	NewStickerSetNotExistError(StickerId uint64) *ServiceError
+	NewStickerAlreadyBuyError(StickerId uint64, userID uint64) *ServiceError
+
+	NewUserMoneyNotEnoughError(userID uint64) *ServiceError
+	NewUserNotChargedError(userID uint64) *ServiceError
+	NewUserChargeMoneyExcessError(userID uint64, charge uint32, min uint32, max uint32) *ServiceError
 }

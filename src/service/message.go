@@ -7,6 +7,8 @@ import (
 	"ChatRoomAPI/src/logger"
 	"ChatRoomAPI/src/repository"
 	"context"
+	"strconv"
+	"strings"
 )
 
 type MessageService interface {
@@ -17,6 +19,7 @@ type MessageService interface {
 type messageServiceImpl struct {
 	messageRepo repository.MessageRepository
 	roomRepo    repository.RoomRepository
+	stickerRepo repository.StickerRepository
 	errWarpper  dtoError.ServiceErrorWarpper
 	logger      logger.Logger
 }
@@ -29,11 +32,45 @@ func init() {
 		roomRepo:    repository.GetRoomRepository(),
 		errWarpper:  dtoError.GetServiceErrorWarpper(),
 		logger:      logger.NewLogger(),
+		stickerRepo: repository.GetStickerRepository(),
 	}
 }
 
 func GetMessageService() MessageService {
 	return message
+}
+
+func (m *messageServiceImpl) checkStickerFromContent(ctx context.Context, content string, userId uint64) (string, error) {
+	chunks := strings.Split(content, " ")
+	for i, chunk := range chunks {
+		subchunks := strings.Split(chunk, "::")
+		if len(subchunks) != 3 {
+			continue
+		}
+		if subchunks[0] != "sticker" {
+			continue
+		}
+
+		stickerSetId, err := strconv.ParseUint(subchunks[1], 10, 64)
+		if err != nil {
+			continue
+		}
+
+		stickerId, err := strconv.ParseUint(subchunks[2], 10, 64)
+		if err != nil {
+			continue
+		}
+
+		_, exist, err := m.stickerRepo.CheckAvailable(ctx, userId, stickerSetId, stickerId)
+		if !exist {
+			chunks[i] = ""
+		} else if err != nil {
+			return "", err
+		}
+	}
+
+	newContent := strings.Join(chunks, " ")
+	return newContent, nil
 }
 
 func (m *messageServiceImpl) AddMessage(ctx context.Context, req *dto.AddMessageRequest) (*dto.AddMessageResponse, *dtoError.ServiceError) {
@@ -52,7 +89,14 @@ func (m *messageServiceImpl) AddMessage(ctx context.Context, req *dto.AddMessage
 		return nil, m.errWarpper.NewUserNotInRoomError(req.UserID, req.RoomID)
 	}
 
-	message, err := m.messageRepo.AddMessage(txContext, req.RoomID, req.UserID, req.Content)
+	newContent, err := m.checkStickerFromContent(ctx, req.Content, req.UserID)
+	if err != nil {
+		tx.Rollback()
+		m.logger.Error(requestId, "m.checkStickerFromContent", req, err)
+		return nil, m.errWarpper.NewDBServiceError(err)
+	}
+
+	message, err := m.messageRepo.AddMessage(txContext, req.RoomID, req.UserID, newContent)
 	if err != nil {
 		m.logger.Error(requestId, "m.messageRepo.AddMessage", req, err)
 		tx.Rollback()

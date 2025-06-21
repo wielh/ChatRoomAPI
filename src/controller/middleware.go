@@ -6,6 +6,7 @@ import (
 	"ChatRoomAPI/src/logger"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -32,6 +33,7 @@ func commonMiddleware(g *gin.RouterGroup) {
 			return fmt.Sprintf("%s::%s", c.ClientIP(), c.Request.URL)
 		},
 	)
+	readLoginSession = sessions.Sessions("login", src.GlobalConfig.RedisSession)
 	g.Use(
 		customRepeatedLimiter,
 		coustomIPLimiter,
@@ -44,8 +46,6 @@ func commonMiddleware(g *gin.RouterGroup) {
 	)
 }
 
-// ==============================================================================================
-// ===
 var readLoginSession gin.HandlerFunc
 var loginFilter func(*gin.Context)
 var log = logger.NewLogger()
@@ -53,7 +53,6 @@ var once sync.Once
 
 func GetLoginFilter() func(*gin.Context) {
 	once.Do(func() {
-		readLoginSession = sessions.Sessions("login", *src.GlobalConfig.RedisSession)
 		loginFilter = func(c *gin.Context) {
 			ok, _, _ := GetSessionValue(c)
 			if !ok {
@@ -67,22 +66,32 @@ func GetLoginFilter() func(*gin.Context) {
 	return loginFilter
 }
 
-func SetSessionValue(c *gin.Context, ID uint64, username string) {
+func SetSessionValue(c *gin.Context, ID uint64, username string) (string, error) {
 	session := sessions.Default(c)
-	session.Set("id", ID)
+	session.Set("id", strconv.FormatUint(ID, 10))
 	session.Set("username", username)
-	session.Save()
+	err := session.Save()
+	if err != nil {
+		return "", err
+	}
+	return session.ID(), nil
 }
 
 func GetSessionValue(c *gin.Context) (bool, uint64, string) {
 	session := sessions.Default(c)
-	id, ok1 := session.Get("id").(uint64)
+	idStr, ok1 := session.Get("id").(string)
 	username, ok2 := session.Get("username").(string)
-	return ok1 && ok2, id, username
-}
 
-// ===
-// ==============================================================================================
+	if !ok1 || !ok2 {
+		return false, 0, ""
+	}
+
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		return false, 0, ""
+	}
+	return true, id, username
+}
 
 func customRequestUUIDGenerator() gin.HandlerFunc {
 	return func(c *gin.Context) {

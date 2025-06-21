@@ -12,7 +12,7 @@ import (
 func roomUserGroupRouter(g *gin.RouterGroup) {
 	group := g.Group("/user")
 
-	group.PUT("/invitation_confrim", roomUser.InvitationConfrim)
+	group.PUT("/invitation_confrim", roomUser.FetchInvitations)
 	group.GET("/invitations", roomUser.InvitationConfrim)
 	group.PUT("/application", roomUser.Apply)
 	group.DELETE("/application", roomUser.DeleteApplication)

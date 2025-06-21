@@ -104,7 +104,7 @@ func (r *roomAdminControllerImpl) DeleteInvitation(c *gin.Context) {
 func (r *roomAdminControllerImpl) FetchInvitations(c *gin.Context) {
 	req := dto.FetchInvitationByAdminRequest{}
 	if err := c.ShouldBindQuery(&req); err != nil {
-		serviceErr := r.errWarpper.NewParseJsonFailedServiceError(err)
+		serviceErr := r.errWarpper.NewParseQueryFailedServiceError(err)
 		c.JSON(serviceErr.ToJsonResponse())
 		return
 	}
@@ -143,7 +143,7 @@ func (r *roomAdminControllerImpl) ConfrimApplication(c *gin.Context) {
 func (r *roomAdminControllerImpl) FetchApplications(c *gin.Context) {
 	req := dto.FetchApplicationByAdminRequest{}
 	if err := c.ShouldBindQuery(&req); err != nil {
-		serviceErr := r.errWarpper.NewParseJsonFailedServiceError(err)
+		serviceErr := r.errWarpper.NewParseQueryFailedServiceError(err)
 		c.JSON(serviceErr.ToJsonResponse())
 		return
 	}
