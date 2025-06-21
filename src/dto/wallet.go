@@ -15,6 +15,6 @@ type ChargeRequest struct {
 
 type ChargeResponse struct {
 	OK         bool
-	MinAccount int
-	MaxAccount int
+	MinAccount uint32
+	MaxAccount uint32
 }

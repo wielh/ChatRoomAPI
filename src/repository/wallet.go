@@ -12,7 +12,7 @@ import (
 
 type WalletRepository interface {
 	GetState(ctx context.Context, userID uint64) (*model.Wallet, bool, error)
-	WalletInit(ctx context.Context, userID uint64)
+	WalletInit(ctx context.Context, userID uint64) error
 	Charge(ctx context.Context, userID uint64, money uint32) error
 	Cost(ctx context.Context, userID uint64, money uint32) (*model.Wallet, bool, error)
 	WriteLog(ctx context.Context, userID uint64, Type int32, money uint32, detail string) (*model.WalletLog, error)
@@ -46,19 +46,18 @@ func (w *walletRepositoryImpl) GetState(ctx context.Context, userID uint64) (*mo
 	return &wallet, true, nil
 }
 
-func (w *walletRepositoryImpl) WalletInit(ctx context.Context, userID uint64) {
+func (w *walletRepositoryImpl) WalletInit(ctx context.Context, userID uint64) error {
 	tx := GetTxContext(ctx, w.DB)
-	var walletMapping model.Wallet
-	tx.FirstOrInit(&walletMapping, model.Wallet{UserID: walletMapping.UserID, Money: 0})
-	tx.Save(&walletMapping)
+	wallet := model.Wallet{
+		UserID: userID,
+		Money:  0,
+	}
+	result := tx.FirstOrCreate(&wallet, model.Wallet{UserID: userID})
+	return result.Error
 }
 
 func (w *walletRepositoryImpl) Charge(ctx context.Context, userID uint64, money uint32) error {
 	tx := GetTxContext(ctx, w.DB)
-	var walletMapping model.Wallet
-	tx.FirstOrInit(&walletMapping, model.Wallet{UserID: walletMapping.UserID})
-	walletMapping.Money += money
-	tx.Save(&walletMapping)
 	result := tx.Model(&model.Wallet{}).Where("user_id=?", userID).Update("money", gorm.Expr("money + ?", money))
 	return result.Error
 }

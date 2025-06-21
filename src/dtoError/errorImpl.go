@@ -9,6 +9,15 @@ var s ServiceErrorWarpper = &ServiceErrorWarpperImpl{}
 
 type ServiceErrorWarpperImpl struct{}
 
+func (s *ServiceErrorWarpperImpl) NewParseQueryFailedServiceError(err error) *ServiceError {
+	return &ServiceError{
+		StatusCode:     http.StatusBadRequest,
+		ErrorCode:      ParseQueryFailed,
+		InternalError:  err,
+		ExtrenalReason: err.Error(),
+	}
+}
+
 func (s *ServiceErrorWarpperImpl) NewUserChargeMoneyExcessError(userID uint64, charge uint32, min uint32, max uint32) *ServiceError {
 	return &ServiceError{
 		StatusCode:     http.StatusBadRequest,

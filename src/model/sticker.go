@@ -6,7 +6,7 @@ type StickerSet struct {
 	Author     string
 	Price      uint32
 	FolderPath string
-	Stickers   []*Sticker
+	Stickers   []*Sticker `gorm:"foreignKey:StickerSetId"`
 	Base
 }
 

@@ -11,6 +11,7 @@ import (
 
 type StickerRepository interface {
 	GetStickerSetInfo(ctx context.Context, stickerSetId uint64) (*model.StickerSet, bool, error)
+	GetAllAvailableStickersInfo(ctx context.Context, UserID uint64) ([]*model.StickerSet, error)
 	CheckAvailable(ctx context.Context, userID uint64, stickerSetId uint64, stickerId uint64) (*model.Sticker, bool, error)
 	CheckStickerUserMappingExist(ctx context.Context, stickerSetId uint64, userId uint64) (bool, error)
 	StickerSetBindingToUser(ctx context.Context, stickerSetId uint64, userId uint64) error
@@ -48,6 +49,20 @@ func (s *stickerRepositoryImpl) CheckAvailable(ctx context.Context, userID uint6
 		return nil, false, result.Error
 	}
 	return &sticker, true, nil
+}
+
+func (s *stickerRepositoryImpl) GetAllAvailableStickersInfo(ctx context.Context, UserID uint64) ([]*model.StickerSet, error) {
+	tx := GetTxContext(ctx, s.DB)
+	var stickerSets []*model.StickerSet
+	result := tx.Preload("Stickers").Table("sticker_sets s").
+		Joins("JOIN sticker_set_user_mappings m ON s.id = m.sticker_set_id").
+		Select("s.id", "s.name", "s.author", "s.price").
+		Where("m.user_id = ?", UserID).Find(&stickerSets)
+
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return stickerSets, nil
 }
 
 func (s *stickerRepositoryImpl) GetStickerSetInfo(ctx context.Context, stickerSetId uint64) (*model.StickerSet, bool, error) {

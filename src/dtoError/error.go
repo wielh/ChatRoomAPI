@@ -30,6 +30,7 @@ const (
 	LoginFailed         = 6
 	ResetPasswordFailed = 7
 	UserNotExist        = 8
+	ParseQueryFailed    = 9
 
 	DBError          = 10000
 	DBNoRowAffected  = 10001
@@ -63,6 +64,7 @@ type ServiceErrorWarpper interface {
 	NewUserHasRegisterdError(username string) *ServiceError
 	NewUsernameExist(username string) *ServiceError
 	NewUserNotExist(Id uint64) *ServiceError
+	NewParseQueryFailedServiceError(err error) *ServiceError // use for err=c.ShouldBindQuery(&req) only
 
 	NewDBServiceError(err error) *ServiceError
 	NewDBNoAffectedServiceError() *ServiceError

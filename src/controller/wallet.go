@@ -13,7 +13,7 @@ func WalletRouter(g *gin.RouterGroup) {
 	group := g.Group("/wallet")
 	group.Use(GetLoginFilter())
 	group.GET("/", wallet.GetState)
-	group.POST("/", wallet.GetState)
+	group.POST("/", wallet.Charge)
 }
 
 type WalletController interface {
@@ -46,8 +46,8 @@ func (w *walletControllerImpl) Charge(c *gin.Context) {
 
 func (w *walletControllerImpl) GetState(c *gin.Context) {
 	var req dto.GetStateRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		serviceErr := w.errWarper.NewParseJsonFailedServiceError(err)
+	if err := c.ShouldBindQuery(&req); err != nil {
+		serviceErr := w.errWarper.NewParseQueryFailedServiceError(err)
 		c.JSON(serviceErr.ToJsonResponse())
 		return
 	}

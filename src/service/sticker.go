@@ -14,6 +14,7 @@ type StickerService interface {
 	GetStickerSetInfo(ctx context.Context, req *dto.GetStickerSetInfoRequest) (*dto.GetStickerSetInfoResponse, *dtoError.ServiceError)
 	BuyStickerSet(ctx context.Context, req *dto.BuyStickerSetRequest) (*dto.BuyStickerResponse, *dtoError.ServiceError)
 	CheckStickerSetAvailable(ctx context.Context, req *dto.CheckStickerSetAvailableRequest) (*dto.CheckStickerSetAvailableResponse, *dtoError.ServiceError)
+	GetAllAvailableStickersInfo(ctx context.Context, req *dto.GetAllAvailableStickersInfoRequest) (*dto.GetAllAvailableStickersInfoResponse, *dtoError.ServiceError)
 }
 
 type stickerServiceImpl struct {
@@ -136,4 +137,35 @@ func (s *stickerServiceImpl) CheckStickerSetAvailable(ctx context.Context, req *
 		return &dto.CheckStickerSetAvailableResponse{Ok: false}, nil
 	}
 	return &dto.CheckStickerSetAvailableResponse{Ok: true}, nil
+}
+
+func (s *stickerServiceImpl) GetAllAvailableStickersInfo(ctx context.Context, req *dto.GetAllAvailableStickersInfoRequest) (*dto.GetAllAvailableStickersInfoResponse, *dtoError.ServiceError) {
+	requestId := common.GetUUID(ctx)
+	stickerSetList, err := s.stickerRepo.GetAllAvailableStickersInfo(ctx, req.UserID)
+	if err != nil {
+		s.logger.Error(requestId, "s.stickerRepo.GetAllAvailableStickersInfo", req, err)
+		return nil, s.errWarpper.NewDBServiceError(err)
+	}
+
+	response := dto.GetAllAvailableStickersInfoResponse{}
+	stickerSetInfoList := make([]dto.StickerSetInfo, len(stickerSetList))
+	for i, stickerSet := range stickerSetList {
+		stickerSetInfoList[i] = dto.StickerSetInfo{
+			Id:     stickerSet.Id,
+			Name:   stickerSet.Name,
+			Author: stickerSet.Author,
+			Price:  stickerSet.Price,
+		}
+
+		stickerInfoList := make([]dto.StickerInfo, len(stickerSet.Stickers))
+		for j, sticker := range stickerSet.Stickers {
+			stickerInfoList[j] = dto.StickerInfo{
+				Id:   sticker.Id,
+				Name: sticker.Name,
+			}
+		}
+		stickerSetInfoList[i].Stickers = stickerInfoList
+	}
+	response.StickerSetInfoList = stickerSetInfoList
+	return &response, nil
 }

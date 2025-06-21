@@ -59,8 +59,14 @@ func (w *walletServiceImpl) Charge(ctx context.Context, req *dto.ChargeRequest) 
 	}
 
 	txContext, tx := repository.SetTxContext(ctx)
-	w.walletRepository.WalletInit(txContext, req.UserID)
-	err := w.walletRepository.Charge(txContext, req.UserID, req.Money)
+	err := w.walletRepository.WalletInit(txContext, req.UserID)
+	if err != nil {
+		w.logger.Error(requestId, "w.walletRepository.WalletInit", req, err)
+		tx.Rollback()
+		return nil, w.errWarpper.NewDBServiceError(err)
+	}
+
+	err = w.walletRepository.Charge(txContext, req.UserID, req.Money)
 	if err != nil {
 		w.logger.Error(requestId, "w.walletRepository.Charge", req, err)
 		tx.Rollback()
@@ -72,5 +78,9 @@ func (w *walletServiceImpl) Charge(ctx context.Context, req *dto.ChargeRequest) 
 		w.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, w.errWarpper.NewDBCommitServiceError(err)
 	}
-	return &dto.ChargeResponse{}, nil
+	return &dto.ChargeResponse{
+		OK:         true,
+		MinAccount: w.MIN_CHARGE_ACCOUNT,
+		MaxAccount: w.MAX_CHARGE_ACCOUNT,
+	}, nil
 }
