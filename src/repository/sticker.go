@@ -34,13 +34,13 @@ func GetStickerRepository() StickerRepository {
 func (s *stickerRepositoryImpl) CheckAvailable(ctx context.Context, userID uint64, stickerSetId uint64, stickerId uint64) (*model.Sticker, bool, error) {
 	tx := GetTxContext(ctx, s.DB)
 	sticker := model.Sticker{}
-	result := tx.Table("stickers As s").
+	result := tx.Table("stickers s").
 		Select("s.*").
-		Joins("JOIN sticker_mappings m ON s.id = m.sticker_id").
-		Joins("JOIN sticker_set_user_mappings um ON um.sticker_set_id = m.sticker_set_id").
-		Where("m.sticker_set_id = ?", stickerSetId).
-		Where("m.sticker_id = ?", stickerId).
-		Where("um.user_id = ?", userID).
+		Joins("JOIN sticker_sets ss ON s.sticker_set_id = ss.id").
+		Joins("JOIN sticker_set_user_mappings m ON m.sticker_set_id = ss.id").
+		Where("s.id = ?", stickerId).
+		Where("ss.id = ?", stickerSetId).
+		Where("m.user_id = ?", userID).
 		First(&sticker)
 
 	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
