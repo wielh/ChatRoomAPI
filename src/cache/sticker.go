@@ -12,25 +12,22 @@ import (
 )
 
 type StickerSetCacheInfo struct {
-	Id         uint64
-	Name       string
-	Author     string
-	Price      uint32
-	FolderPath string
-	Stickers   map[uint64]*StickerCacheInfo
+	Id       uint64
+	Name     string
+	Author   string
+	Price    uint32
+	Stickers map[uint64]*StickerCacheInfo
 }
 
 type StickerCacheInfo struct {
-	Id           uint64
-	StickerSetId uint64
-	Name         string
-	Filename     string
+	Id   uint64
+	Name string
 }
 
 type StickerCache interface {
 	StoreStickerSetInfoByUser(ctx context.Context, userId uint64, infos map[uint64]*StickerSetCacheInfo) error
-	InsertNewStickerSetInfoByUser(ctx context.Context, userId uint64, info *StickerSetCacheInfo) error
-	GetAllStickerSetInfoByUser(ctx context.Context, userId uint64) (map[uint64]*StickerSetCacheInfo, error)
+	InsertNewStickerSetInfoByUser(ctx context.Context, userId uint64, info *StickerSetCacheInfo) (bool, error)
+	GetAllStickerSetInfoByUser(ctx context.Context, userId uint64) (map[uint64]*StickerSetCacheInfo, bool, error)
 	CheckStickerIDValid(ctx context.Context, userId uint64, stickerSetId uint64, stickerId uint64) (bool, error)
 	ClearAllStickerCacheByUser(ctx context.Context, userId uint64) error
 }
@@ -59,44 +56,53 @@ func (s *stickerCacheImpl) CheckStickerIDValid(ctx context.Context, userId uint6
 	return isMember, nil
 }
 
-func (s *stickerCacheImpl) GetAllStickerSetInfoByUser(ctx context.Context, userId uint64) (map[uint64]*StickerSetCacheInfo, error) {
+func (s *stickerCacheImpl) GetAllStickerSetInfoByUser(ctx context.Context, userId uint64) (map[uint64]*StickerSetCacheInfo, bool, error) {
 
 	key := s.getUserStickerInfosKey(userId)
+	exists, err := s.redisClient.Exists(ctx, key).Result()
+	if err != nil {
+		return nil, false, fmt.Errorf("redis EXISTS failed: %w", err)
+	}
+	if exists == 0 {
+		return nil, false, nil
+	}
+
 	result, err := s.redisClient.HGetAll(ctx, key).Result()
 	if err != nil {
-		return nil, fmt.Errorf("redis HGetAll failed: %w", err)
+		return nil, false, fmt.Errorf("redis HGetAll failed: %w", err)
 	}
 
 	stickerSets := make(map[uint64]*StickerSetCacheInfo)
 	for idStr, jsonStr := range result {
 		var info StickerSetCacheInfo
 		if err := json.Unmarshal([]byte(jsonStr), &info); err != nil {
-			return nil, fmt.Errorf("json unmarshal failed for sticker set ID %s: %w", idStr, err)
+			return nil, false, fmt.Errorf("json unmarshal failed for sticker set ID %s: %w", idStr, err)
 		}
 
 		var id uint64
 		if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
-			return nil, fmt.Errorf("invalid sticker set ID key: %s", idStr)
+			return nil, false, fmt.Errorf("invalid sticker set ID key: %s", idStr)
 		}
-
 		stickerSets[id] = &info
 	}
-	return stickerSets, nil
+	return stickerSets, true, nil
 }
 
-func (s *stickerCacheImpl) InsertNewStickerSetInfoByUser(ctx context.Context, userId uint64, info *StickerSetCacheInfo) error {
-	infos, err := s.GetAllStickerSetInfoByUser(ctx, userId)
+func (s *stickerCacheImpl) InsertNewStickerSetInfoByUser(ctx context.Context, userId uint64, info *StickerSetCacheInfo) (bool, error) {
+	infos, keyExist, err := s.GetAllStickerSetInfoByUser(ctx, userId)
 	if err != nil {
-		return err
+		return false, err
+	} else if !keyExist {
+		return false, nil
 	}
 
 	for id := range infos {
 		if id == info.Id {
-			return nil
+			return true, nil
 		}
 	}
 	infos[info.Id] = info
-	return s.StoreStickerSetInfoByUser(ctx, userId, infos)
+	return true, s.StoreStickerSetInfoByUser(ctx, userId, infos)
 }
 
 func (s *stickerCacheImpl) StoreStickerSetInfoByUser(ctx context.Context, userId uint64, infos map[uint64]*StickerSetCacheInfo) error {
@@ -167,7 +173,7 @@ var sticker StickerCache
 
 func init() {
 	sticker = &stickerCacheImpl{
-		keyExpiredTime: 5 * time.Minute,
+		keyExpiredTime: 60 * time.Minute,
 		redisClient:    src.GlobalConfig.Redis,
 	}
 }

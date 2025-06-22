@@ -9,6 +9,7 @@ type AddMessageRequest struct {
 type AddMessageResponse struct {
 	ID        uint64 `json:"id" binding:"required"`
 	CreatedAt uint64 `json:"create_time" binding:"required"`
+	Content   string `json:"content" binding:"required"`
 }
 
 type FetchMessageRequest struct {

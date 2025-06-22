@@ -48,8 +48,8 @@ func (m *messageServiceImpl) checkStickerFromContent(ctx context.Context, conten
 	data := map[string]any{"userId": userId, "content": content}
 
 	chunks := strings.Split(content, " ")
-	userStickerSetCacheMap, err := m.stickerCache.GetAllStickerSetInfoByUser(ctx, userId)
-	if err != nil {
+	userStickerSetCacheMap, keyExist, err := m.stickerCache.GetAllStickerSetInfoByUser(ctx, userId)
+	if err != nil || !keyExist {
 		m.logger.Error(requestId, "m.stickerCache.GetAllStickerSetInfoByUser", data, err)
 		m.stickerCache.ClearAllStickerCacheByUser(ctx, userId)
 		stickerSetList, err := m.stickerRepo.GetAllAvailableStickersInfo(ctx, userId)
@@ -153,6 +153,7 @@ func (m *messageServiceImpl) AddMessage(ctx context.Context, req *dto.AddMessage
 	return &dto.AddMessageResponse{
 		ID:        message.ID,
 		CreatedAt: common.TimeToUint64(message.CreatedAt),
+		Content:   newContent,
 	}, nil
 }
 
