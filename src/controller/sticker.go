@@ -14,14 +14,12 @@ func stickerRouter(g *gin.RouterGroup) {
 	group.Use(GetLoginFilter())
 	group.GET("/info", sticker.GetStickerSetInfo)
 	group.GET("/list", sticker.GetAllAvailableStickersInfo)
-	group.GET("/available", sticker.CheckStickerSetAvailable)
 	group.PUT("/buy", sticker.BuyStickerSet)
 }
 
 type StickerController interface {
 	GetStickerSetInfo(c *gin.Context)
 	BuyStickerSet(c *gin.Context)
-	CheckStickerSetAvailable(c *gin.Context)
 	GetAllAvailableStickersInfo(c *gin.Context)
 }
 
@@ -50,24 +48,6 @@ func (s *stickerControllerImpl) BuyStickerSet(c *gin.Context) {
 	_, userId, _ := GetSessionValue(c)
 	req.UserID = userId
 	res, serviceErr := s.stickerService.BuyStickerSet(c, &req)
-	if serviceErr != nil {
-		c.JSON(serviceErr.ToJsonResponse())
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"result": res})
-}
-
-func (s *stickerControllerImpl) CheckStickerSetAvailable(c *gin.Context) {
-	var req dto.CheckStickerSetAvailableRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		serviceErr := s.errWarper.NewParseQueryFailedServiceError(err)
-		c.JSON(serviceErr.ToJsonResponse())
-		return
-	}
-
-	_, userId, _ := GetSessionValue(c)
-	req.UserID = userId
-	res, serviceErr := s.stickerService.CheckStickerSetAvailable(c, &req)
 	if serviceErr != nil {
 		c.JSON(serviceErr.ToJsonResponse())
 		return

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"ChatRoomAPI/src/cache"
 	"ChatRoomAPI/src/common"
 	"ChatRoomAPI/src/dto"
 	"ChatRoomAPI/src/dtoError"
@@ -13,7 +14,6 @@ import (
 type StickerService interface {
 	GetStickerSetInfo(ctx context.Context, req *dto.GetStickerSetInfoRequest) (*dto.GetStickerSetInfoResponse, *dtoError.ServiceError)
 	BuyStickerSet(ctx context.Context, req *dto.BuyStickerSetRequest) (*dto.BuyStickerResponse, *dtoError.ServiceError)
-	CheckStickerSetAvailable(ctx context.Context, req *dto.CheckStickerSetAvailableRequest) (*dto.CheckStickerSetAvailableResponse, *dtoError.ServiceError)
 	GetAllAvailableStickersInfo(ctx context.Context, req *dto.GetAllAvailableStickersInfoRequest) (*dto.GetAllAvailableStickersInfoResponse, *dtoError.ServiceError)
 }
 
@@ -22,6 +22,7 @@ type stickerServiceImpl struct {
 	walletRepository repository.WalletRepository
 	stickerRepo      repository.StickerRepository
 	errWarpper       dtoError.ServiceErrorWarpper
+	stickerCache     cache.StickerCache
 }
 
 var sticker StickerService
@@ -32,6 +33,7 @@ func init() {
 		walletRepository: repository.GetWalletRepository(),
 		errWarpper:       dtoError.GetServiceErrorWarpper(),
 		logger:           logger.NewZeroLogger(),
+		stickerCache:     cache.GetStickerCache(),
 	}
 }
 
@@ -116,41 +118,88 @@ func (s *stickerServiceImpl) BuyStickerSet(ctx context.Context, req *dto.BuyStic
 		s.logger.Error(requestId, "tx.Commit", req, err)
 		return nil, s.errWarpper.NewDBCommitServiceError(err)
 	}
+
+	stickerCacheInfo := cache.StickerSetCacheInfo{
+		Id:     stickerSet.Id,
+		Name:   stickerSet.Name,
+		Author: stickerSet.Name,
+		Price:  stickerSet.Price,
+	}
+	s.stickerCache.InsertNewStickerSetInfoByUser(ctx, req.UserID, &stickerCacheInfo)
 	return &dto.BuyStickerResponse{}, nil
-}
-
-func (s *stickerServiceImpl) CheckStickerSetAvailable(ctx context.Context, req *dto.CheckStickerSetAvailableRequest) (*dto.CheckStickerSetAvailableResponse, *dtoError.ServiceError) {
-	requestId := common.GetUUID(ctx)
-	_, exist, err := s.stickerRepo.GetStickerSetInfo(ctx, req.StickerSetID)
-	if err != nil {
-		s.logger.Error(requestId, "s.stickerRepo.GetStickerSetInfo", req, err)
-		return nil, s.errWarpper.NewDBServiceError(err)
-	} else if !exist {
-		return &dto.CheckStickerSetAvailableResponse{Ok: false}, nil
-	}
-
-	exist, err = s.stickerRepo.CheckStickerUserMappingExist(ctx, req.StickerSetID, req.UserID)
-	if err != nil {
-		s.logger.Error(requestId, "s.stickerRepo.GetStickerSetInfo", req, err)
-		return nil, s.errWarpper.NewDBServiceError(err)
-	} else if !exist {
-		return &dto.CheckStickerSetAvailableResponse{Ok: false}, nil
-	}
-	return &dto.CheckStickerSetAvailableResponse{Ok: true}, nil
 }
 
 func (s *stickerServiceImpl) GetAllAvailableStickersInfo(ctx context.Context, req *dto.GetAllAvailableStickersInfoRequest) (*dto.GetAllAvailableStickersInfoResponse, *dtoError.ServiceError) {
 	requestId := common.GetUUID(ctx)
+
+	stickerSetCacheList, err := s.stickerCache.GetAllStickerSetInfoByUser(ctx, req.UserID)
+	if err == nil && stickerSetCacheList != nil {
+		response := dto.GetAllAvailableStickersInfoResponse{}
+		stickerSetInfoList := make([]dto.StickerSetInfo, len(stickerSetCacheList))
+		for i, stickerSet := range stickerSetCacheList {
+			stickerSetInfoList[i] = dto.StickerSetInfo{
+				Id:     stickerSet.Id,
+				Name:   stickerSet.Name,
+				Author: stickerSet.Author,
+				Price:  stickerSet.Price,
+			}
+
+			stickerInfoList := []dto.StickerInfo{}
+			for _, sticker := range stickerSet.Stickers {
+				stickerInfoList = append(stickerInfoList,
+					dto.StickerInfo{
+						Id:   sticker.Id,
+						Name: sticker.Name,
+					},
+				)
+			}
+			stickerSetInfoList[i].Stickers = stickerInfoList
+		}
+		return &response, nil
+	} else if err != nil {
+		s.logger.Error(requestId, "s.stickerCache.GetAllStickerSetInfoByUser", req, err)
+	}
+
+	err = s.stickerCache.ClearAllStickerCacheByUser(ctx, req.UserID)
+	if err != nil {
+		s.logger.Error(requestId, "s.stickerCache.ClearAllStickerCacheByUser", req, err)
+	}
+
 	stickerSetList, err := s.stickerRepo.GetAllAvailableStickersInfo(ctx, req.UserID)
 	if err != nil {
 		s.logger.Error(requestId, "s.stickerRepo.GetAllAvailableStickersInfo", req, err)
 		return nil, s.errWarpper.NewDBServiceError(err)
 	}
 
+	go func() {
+		cacheInfos := make(map[uint64]*cache.StickerSetCacheInfo)
+		for _, stickerSet := range stickerSetList {
+			cacheInfos[stickerSet.Id] = &cache.StickerSetCacheInfo{
+				Id:     stickerSet.Id,
+				Name:   stickerSet.Name,
+				Author: stickerSet.Author,
+				Price:  stickerSet.Price,
+			}
+
+			stickerInfoMap := make(map[uint64]*cache.StickerCacheInfo)
+			for _, sticker := range stickerSet.Stickers {
+				stickerInfoMap[sticker.Id] = &cache.StickerCacheInfo{
+					Id:   sticker.Id,
+					Name: sticker.Name,
+				}
+			}
+			cacheInfos[stickerSet.Id].Stickers = stickerInfoMap
+		}
+		err = s.stickerCache.StoreStickerSetInfoByUser(ctx, req.UserID, cacheInfos)
+		if err != nil {
+			s.logger.Error(requestId, "s.stickerCache.StoreStickerSetInfoByUser", req, err)
+		}
+	}()
+
 	response := dto.GetAllAvailableStickersInfoResponse{}
-	stickerSetInfoList := make([]dto.StickerSetInfo, len(stickerSetList))
+	stickerSetInfoList := make([]*dto.StickerSetInfo, len(stickerSetList))
 	for i, stickerSet := range stickerSetList {
-		stickerSetInfoList[i] = dto.StickerSetInfo{
+		stickerSetInfoList[i] = &dto.StickerSetInfo{
 			Id:     stickerSet.Id,
 			Name:   stickerSet.Name,
 			Author: stickerSet.Author,

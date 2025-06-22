@@ -1,6 +1,7 @@
 package service
 
 import (
+	"ChatRoomAPI/src/cache"
 	"ChatRoomAPI/src/common"
 	"ChatRoomAPI/src/dto"
 	"ChatRoomAPI/src/dtoError"
@@ -17,22 +18,24 @@ type MessageService interface {
 }
 
 type messageServiceImpl struct {
-	messageRepo repository.MessageRepository
-	roomRepo    repository.RoomRepository
-	stickerRepo repository.StickerRepository
-	errWarpper  dtoError.ServiceErrorWarpper
-	logger      logger.Logger
+	messageRepo  repository.MessageRepository
+	roomRepo     repository.RoomRepository
+	stickerRepo  repository.StickerRepository
+	errWarpper   dtoError.ServiceErrorWarpper
+	logger       logger.Logger
+	stickerCache cache.StickerCache
 }
 
 var message MessageService
 
 func init() {
 	message = &messageServiceImpl{
-		messageRepo: repository.GetMessageRepository(),
-		roomRepo:    repository.GetRoomRepository(),
-		errWarpper:  dtoError.GetServiceErrorWarpper(),
-		logger:      logger.NewLogger(),
-		stickerRepo: repository.GetStickerRepository(),
+		messageRepo:  repository.GetMessageRepository(),
+		roomRepo:     repository.GetRoomRepository(),
+		errWarpper:   dtoError.GetServiceErrorWarpper(),
+		logger:       logger.NewLogger(),
+		stickerRepo:  repository.GetStickerRepository(),
+		stickerCache: cache.GetStickerCache(),
 	}
 }
 
@@ -41,7 +44,43 @@ func GetMessageService() MessageService {
 }
 
 func (m *messageServiceImpl) checkStickerFromContent(ctx context.Context, content string, userId uint64) (string, error) {
+	requestId := common.GetUUID(ctx)
+	data := map[string]any{"userId": userId, "content": content}
+
 	chunks := strings.Split(content, " ")
+	userStickerSetCacheMap, err := m.stickerCache.GetAllStickerSetInfoByUser(ctx, userId)
+	if err != nil {
+		m.logger.Error(requestId, "m.stickerCache.GetAllStickerSetInfoByUser", data, err)
+		m.stickerCache.ClearAllStickerCacheByUser(ctx, userId)
+		stickerSetList, err := m.stickerRepo.GetAllAvailableStickersInfo(ctx, userId)
+		if err != nil {
+			return "", err
+		}
+
+		userStickerSetCacheMap = make(map[uint64]*cache.StickerSetCacheInfo)
+		for _, stickerSet := range stickerSetList {
+			stickerSetCacheInfo := &cache.StickerSetCacheInfo{
+				Id:       stickerSet.Id,
+				Name:     stickerSet.Name,
+				Author:   stickerSet.Author,
+				Price:    stickerSet.Price,
+				Stickers: make(map[uint64]*cache.StickerCacheInfo),
+			}
+
+			for _, sticker := range stickerSet.Stickers {
+				stickerSetCacheInfo.Stickers[sticker.Id] = &cache.StickerCacheInfo{
+					Id:   sticker.Id,
+					Name: sticker.Name,
+				}
+			}
+			userStickerSetCacheMap[stickerSet.Id] = stickerSetCacheInfo
+		}
+		err = m.stickerCache.StoreStickerSetInfoByUser(ctx, userId, userStickerSetCacheMap)
+		if err != nil {
+			m.logger.Error(requestId, "m.stickerCache.StoreStickerSetInfoByUser", data, err)
+		}
+	}
+
 	for i, chunk := range chunks {
 		subchunks := strings.Split(chunk, "::")
 		if len(subchunks) != 3 {
@@ -61,11 +100,14 @@ func (m *messageServiceImpl) checkStickerFromContent(ctx context.Context, conten
 			continue
 		}
 
-		_, exist, err := m.stickerRepo.CheckAvailable(ctx, userId, stickerSetId, stickerId)
-		if !exist {
+		StickerSetCache, ok := userStickerSetCacheMap[stickerSetId]
+		if !ok {
 			chunks[i] = ""
-		} else if err != nil {
-			return "", err
+		}
+
+		_, ok = StickerSetCache.Stickers[stickerId]
+		if !ok {
+			chunks[i] = ""
 		}
 	}
 
