@@ -42,5 +42,5 @@ type GetAllAvailableStickersInfoRequest struct {
 }
 
 type GetAllAvailableStickersInfoResponse struct {
-	StickerSetInfoList []StickerSetInfo
+	StickerSetInfoList []*StickerSetInfo
 }

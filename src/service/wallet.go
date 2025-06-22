@@ -28,7 +28,7 @@ func init() {
 	wallet = &walletServiceImpl{
 		walletRepository:   repository.GetWalletRepository(),
 		errWarpper:         dtoError.GetServiceErrorWarpper(),
-		logger:             logger.NewZeroLogger(),
+		logger:             logger.NewErrorLogger(),
 		MIN_CHARGE_ACCOUNT: 1,
 		MAX_CHARGE_ACCOUNT: 1000,
 	}
