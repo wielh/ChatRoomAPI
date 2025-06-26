@@ -12,6 +12,11 @@ import (
 	"github.com/gin-contrib/sessions"
 	redisStore "github.com/gin-contrib/sessions/redis"
 	"github.com/go-redis/redis/v8"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"gopkg.in/yaml.v2"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -103,6 +108,12 @@ func newGlobalConfig() error {
 			return
 		}
 
+		fmt.Println("opentelemetry init...")
+		err = GlobalConfig.TempInit()
+		if err != nil {
+			return
+		}
+
 		fmt.Println("Init done")
 	})
 	return err
@@ -185,6 +196,43 @@ func (a *allConfigs) redisInit() error {
 	})
 
 	a.RedisSession = store
+	return nil
+}
+
+func (a *allConfigs) TempInit() error {
+	ctx := context.Background()
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint("localhost:4318"),
+		otlptracehttp.WithInsecure(),
+	)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+		return err
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceName("test-connection"),
+		),
+	)
+	if err != nil {
+		log.Fatalf("failed to create resource: %v", err)
+		return err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+	otel.SetTracerProvider(tp)
+
+	tracer := tp.Tracer("test-connection")
+	ctx, span := tracer.Start(context.Background(), "TestConnection")
+
+	log.Println("Span started")
+	time.Sleep(500 * time.Millisecond) // 模擬工作
+	span.End()
+	tp.Shutdown(ctx)
 	return nil
 }
 
