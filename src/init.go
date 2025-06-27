@@ -12,7 +12,6 @@ import (
 	"github.com/gin-contrib/sessions"
 	redisStore "github.com/gin-contrib/sessions/redis"
 	"github.com/go-redis/redis/v8"
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -66,6 +65,10 @@ type config struct {
 		PoolSize     int    `yaml:"max_connection"`
 		MinIdleConns int    `yaml:"min_connection"`
 	} `yaml:"redis"`
+	Tempo struct {
+		Host string `yaml:"host"`
+		Port int    `yaml:"port"`
+	}
 }
 
 type allConfigs struct {
@@ -109,7 +112,7 @@ func newGlobalConfig() error {
 		}
 
 		fmt.Println("opentelemetry init...")
-		err = GlobalConfig.TempInit()
+		err = GlobalConfig.tempoInit()
 		if err != nil {
 			return
 		}
@@ -199,10 +202,10 @@ func (a *allConfigs) redisInit() error {
 	return nil
 }
 
-func (a *allConfigs) TempInit() error {
+func (a *allConfigs) tempoInit() error {
 	ctx := context.Background()
 	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint("localhost:4318"),
+		otlptracehttp.WithEndpoint(fmt.Sprintf("%s:%d", a.YamlConfig.Tempo.Host, a.YamlConfig.Tempo.Port)),
 		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
@@ -224,13 +227,10 @@ func (a *allConfigs) TempInit() error {
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
 	)
-	otel.SetTracerProvider(tp)
-
 	tracer := tp.Tracer("test-connection")
 	ctx, span := tracer.Start(context.Background(), "TestConnection")
 
 	log.Println("Span started")
-	time.Sleep(500 * time.Millisecond) // 模擬工作
 	span.End()
 	tp.Shutdown(ctx)
 	return nil

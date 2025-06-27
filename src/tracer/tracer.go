@@ -2,7 +2,6 @@ package tracer
 
 import (
 	"context"
-	"log"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
@@ -11,26 +10,29 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 )
 
-func InitTracer(serviceName string) func(context.Context) error {
+func init() {
 	ctx := context.Background()
-
 	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithInsecure(),                 // 無 TLS
-		otlptracehttp.WithEndpoint("localhost:4318"), // 本機 Jaeger OTLP endpoint
+		otlptracehttp.WithEndpoint("localhost:4318"),
+		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
-		log.Fatalf("failed to create OTLP exporter: %v", err)
+		panic("failed to create exporter: " + err.Error())
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceName("gin-practice"),
+		),
+	)
+	if err != nil {
+		panic("failed to create exporter: " + err.Error())
 	}
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter),
-		sdktrace.WithResource(resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(serviceName),
-		)),
+		sdktrace.WithResource(res),
 	)
 
 	otel.SetTracerProvider(tp)
-
-	return tp.Shutdown
 }
