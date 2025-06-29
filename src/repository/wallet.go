@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
 
@@ -20,7 +21,8 @@ type WalletRepository interface {
 }
 
 type walletRepositoryImpl struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	tracer trace.Tracer
 }
 
 var wallet WalletRepository
@@ -48,6 +50,8 @@ func (w *walletRepositoryImpl) GetState(ctx context.Context, userID uint64) (*mo
 
 func (w *walletRepositoryImpl) WalletInit(ctx context.Context, userID uint64) error {
 	tx := GetTxContext(ctx, w.DB)
+	ctx, span := w.tracer.Start(ctx, "WalletInit")
+	defer span.End()
 	wallet := model.Wallet{
 		UserID: userID,
 		Money:  0,
@@ -58,12 +62,16 @@ func (w *walletRepositoryImpl) WalletInit(ctx context.Context, userID uint64) er
 
 func (w *walletRepositoryImpl) Charge(ctx context.Context, userID uint64, money uint32) error {
 	tx := GetTxContext(ctx, w.DB)
+	ctx, span := w.tracer.Start(ctx, "Charge")
+	defer span.End()
 	result := tx.Model(&model.Wallet{}).Where("user_id=?", userID).Update("money", gorm.Expr("money + ?", money))
 	return result.Error
 }
 
 func (w *walletRepositoryImpl) Cost(ctx context.Context, userID uint64, money uint32) (*model.Wallet, bool, error) {
 	tx := GetTxContext(ctx, w.DB)
+	ctx, span := w.tracer.Start(ctx, "Cost")
+	defer span.End()
 	result := tx.Model(&model.Wallet{}).Where("user_id=? and money>=?", userID, money).Update("money", gorm.Expr("money - ?", money))
 	if result.Error != nil {
 		return nil, false, result.Error

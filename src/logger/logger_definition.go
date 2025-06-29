@@ -40,7 +40,6 @@ func getMessage(requestId string, checkpoint string, data any, err error, caller
 	} else {
 		errStr = ""
 	}
-	message := fmt.Sprintf(
-		"[%s] requestId:{%s}, caller:{%s}, checkpoint:{%s}, error:{%s}, data:{%+v}\n", time, requestId, caller, checkpoint, errStr, data)
+	message := fmt.Sprintf("[%s] requestId:{%s}, caller:{%s}, checkpoint:{%s}, error:{%s}, data:{%+v}\n", time, requestId, caller, checkpoint, errStr, data)
 	return message
 }

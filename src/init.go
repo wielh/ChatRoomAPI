@@ -12,6 +12,11 @@ import (
 	"github.com/gin-contrib/sessions"
 	redisStore "github.com/gin-contrib/sessions/redis"
 	"github.com/go-redis/redis/v8"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 	"gopkg.in/yaml.v2"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -61,6 +66,10 @@ type config struct {
 		PoolSize     int    `yaml:"max_connection"`
 		MinIdleConns int    `yaml:"min_connection"`
 	} `yaml:"redis"`
+	Tempo struct {
+		Host string `yaml:"host"`
+		Port int    `yaml:"port"`
+	}
 }
 
 type allConfigs struct {
@@ -99,6 +108,12 @@ func newGlobalConfig() error {
 
 		fmt.Println("redis connection init...")
 		err = GlobalConfig.redisInit()
+		if err != nil {
+			return
+		}
+
+		fmt.Println("opentelemetry init...")
+		err = GlobalConfig.tempoInit()
 		if err != nil {
 			return
 		}
@@ -185,6 +200,43 @@ func (a *allConfigs) redisInit() error {
 	})
 
 	a.RedisSession = store
+	return nil
+}
+
+func (a *allConfigs) tempoInit() error {
+	ctx := context.Background()
+	tempoConfig := GlobalConfig.YamlConfig.Tempo
+	tempoURL := fmt.Sprintf("%s:%d", tempoConfig.Host, tempoConfig.Port)
+
+	exporter, err := otlptracehttp.New(ctx,
+		otlptracehttp.WithEndpoint(tempoURL),
+		otlptracehttp.WithInsecure(),
+	)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+		return err
+	}
+
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceName("gin-practice"),
+		),
+	)
+	if err != nil {
+		log.Fatalf("failed to create resource: %v", err)
+		return err
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(res),
+	)
+
+	otel.SetTracerProvider(tp)
+	testTracr := tp.Tracer("test")
+	_, span := testTracr.Start(ctx, "init")
+	time.Sleep(100 * time.Millisecond) // Simulate some work
+	defer span.End()
 	return nil
 }
 
