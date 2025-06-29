@@ -20,13 +20,13 @@ server:
 database:
   host: "localhost"
   user: "postgres"
-  password: "root"
+  password: "..."
   name: "ginExample"
   port: 5432
   sslmode: disable
 redis:
   address: "localhost:6379"
-  password: ""
+  password: "..."
   db: 0
   max_connection: 30
   min_connection: 5
