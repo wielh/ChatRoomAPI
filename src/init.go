@@ -12,6 +12,7 @@ import (
 	"github.com/gin-contrib/sessions"
 	redisStore "github.com/gin-contrib/sessions/redis"
 	"github.com/go-redis/redis/v8"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -204,8 +205,11 @@ func (a *allConfigs) redisInit() error {
 
 func (a *allConfigs) tempoInit() error {
 	ctx := context.Background()
+	tempoConfig := GlobalConfig.YamlConfig.Tempo
+	tempoURL := fmt.Sprintf("%s:%d", tempoConfig.Host, tempoConfig.Port)
+
 	exporter, err := otlptracehttp.New(ctx,
-		otlptracehttp.WithEndpoint(fmt.Sprintf("%s:%d", a.YamlConfig.Tempo.Host, a.YamlConfig.Tempo.Port)),
+		otlptracehttp.WithEndpoint(tempoURL),
 		otlptracehttp.WithInsecure(),
 	)
 	if err != nil {
@@ -215,7 +219,7 @@ func (a *allConfigs) tempoInit() error {
 
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
-			semconv.ServiceName("test-connection"),
+			semconv.ServiceName("gin-practice"),
 		),
 	)
 	if err != nil {
@@ -227,12 +231,12 @@ func (a *allConfigs) tempoInit() error {
 		sdktrace.WithBatcher(exporter),
 		sdktrace.WithResource(res),
 	)
-	tracer := tp.Tracer("test-connection")
-	ctx, span := tracer.Start(context.Background(), "TestConnection")
 
-	log.Println("Span started")
-	span.End()
-	tp.Shutdown(ctx)
+	otel.SetTracerProvider(tp)
+	testTracr := tp.Tracer("test")
+	_, span := testTracr.Start(ctx, "init")
+	time.Sleep(100 * time.Millisecond) // Simulate some work
+	defer span.End()
 	return nil
 }
 

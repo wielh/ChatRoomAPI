@@ -7,6 +7,9 @@ import (
 	"ChatRoomAPI/src/logger"
 	"ChatRoomAPI/src/repository"
 	"context"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type WalletService interface {
@@ -18,6 +21,7 @@ type walletServiceImpl struct {
 	logger             logger.Logger
 	walletRepository   repository.WalletRepository
 	errWarpper         dtoError.ServiceErrorWarpper
+	tracer             trace.Tracer
 	MIN_CHARGE_ACCOUNT uint32
 	MAX_CHARGE_ACCOUNT uint32
 }
@@ -29,6 +33,7 @@ func init() {
 		walletRepository:   repository.GetWalletRepository(),
 		errWarpper:         dtoError.GetServiceErrorWarpper(),
 		logger:             logger.NewErrorLogger(),
+		tracer:             otel.Tracer("walletService"),
 		MIN_CHARGE_ACCOUNT: 1,
 		MAX_CHARGE_ACCOUNT: 1000,
 	}
@@ -53,6 +58,9 @@ func (w *walletServiceImpl) GetState(ctx context.Context, req *dto.GetStateReque
 // TODO: this is mock charge api endpoint only
 func (w *walletServiceImpl) Charge(ctx context.Context, req *dto.ChargeRequest) (*dto.ChargeResponse, *dtoError.ServiceError) {
 	requestId := common.GetUUID(ctx)
+	ctx, span := w.tracer.Start(ctx, "Charge")
+	defer span.End()
+
 	w.logger.Info(requestId, "charge request start", req, nil)
 	if req.Money < w.MIN_CHARGE_ACCOUNT || req.Money > w.MAX_CHARGE_ACCOUNT {
 		return nil, w.errWarpper.NewUserChargeMoneyExcessError(req.UserID, req.Money, w.MIN_CHARGE_ACCOUNT, w.MAX_CHARGE_ACCOUNT)

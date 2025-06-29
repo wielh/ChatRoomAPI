@@ -9,6 +9,8 @@ import (
 	"context"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,6 +25,7 @@ type userServiceImpl struct {
 	logger      logger.Logger
 	accountRepo repository.AccountRepository
 	errWarpper  dtoError.ServiceErrorWarpper
+	tracer      trace.Tracer
 }
 
 var user UserService
@@ -32,6 +35,7 @@ func init() {
 		accountRepo: repository.GetAccountRepository(),
 		errWarpper:  dtoError.GetServiceErrorWarpper(),
 		logger:      logger.NewInfoLogger(),
+		tracer:      otel.Tracer("userService"),
 	}
 }
 
@@ -41,13 +45,15 @@ func GetAccountService() UserService {
 
 func (a *userServiceImpl) UserRegisterService(ctx context.Context, req *dto.UserRegisterRequest) (*dto.UserRegisterResponse, *dtoError.ServiceError) {
 	requestId := common.GetUUID(ctx)
+	ctx, span := a.tracer.Start(ctx, "Register")
+	defer span.End()
+
 	data := map[string]any{
 		"username": req.Username,
 		"name":     req.Name,
 		"email":    req.Email,
 	}
 	a.logger.Info(requestId, "start", data, nil)
-	defer func() { a.logger.Info(requestId, "end", data, nil) }()
 
 	hashedPassword, _ := hashPassword(req.Password)
 	parsedTime, _ := time.Parse("2006-01-02", req.Birthday)
@@ -63,9 +69,11 @@ func (a *userServiceImpl) UserRegisterService(ctx context.Context, req *dto.User
 
 func (a *userServiceImpl) UserLoginService(ctx context.Context, req *dto.UserLoginRequest) (*dto.UserLoginResponse, *dtoError.ServiceError) {
 	requestId := common.GetUUID(ctx)
+	ctx, span := a.tracer.Start(ctx, "Login")
+	defer span.End()
+
 	data := map[string]any{"username": req.Username}
 	a.logger.Info(requestId, "start", data, nil)
-	defer func() { a.logger.Info(requestId, "end", data, nil) }()
 
 	userModel, exist, err := a.accountRepo.SelectUserByName(ctx, req.Username)
 	if err != nil {
@@ -88,9 +96,11 @@ func (a *userServiceImpl) UserLoginService(ctx context.Context, req *dto.UserLog
 
 func (a *userServiceImpl) ResetPasswordService(ctx context.Context, req *dto.ResetPasswordRequest) *dtoError.ServiceError {
 	requestId := common.GetUUID(ctx)
+	ctx, span := a.tracer.Start(ctx, "ResetPassword")
+	defer span.End()
+
 	data := map[string]any{"username": req.Username}
 	a.logger.Info(requestId, "start", data, nil)
-	defer func() { a.logger.Info(requestId, "end", data, nil) }()
 
 	txContext, tx := repository.SetTxContext(ctx)
 	user, ok, err := a.accountRepo.SelectUserByName(txContext, req.Username)
@@ -132,7 +142,6 @@ func (a *userServiceImpl) UserInfoService(ctx context.Context, req *dto.GetUserI
 	requestId := common.GetUUID(ctx)
 	data := map[string]any{"id": req.ID}
 	a.logger.Info(requestId, "start", data, nil)
-	defer func() { a.logger.Info(requestId, "end", data, nil) }()
 
 	user, err := a.accountRepo.UserInfo(ctx, req.ID)
 	if err != nil {

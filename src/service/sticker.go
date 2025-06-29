@@ -9,6 +9,9 @@ import (
 	"ChatRoomAPI/src/repository"
 	"context"
 	"fmt"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type StickerService interface {
@@ -23,6 +26,7 @@ type stickerServiceImpl struct {
 	stickerRepo      repository.StickerRepository
 	errWarpper       dtoError.ServiceErrorWarpper
 	stickerCache     cache.StickerCache
+	tracer           trace.Tracer
 }
 
 var sticker StickerService
@@ -34,6 +38,7 @@ func init() {
 		errWarpper:       dtoError.GetServiceErrorWarpper(),
 		logger:           logger.NewInfoLogger(),
 		stickerCache:     cache.GetStickerCache(),
+		tracer:           otel.Tracer("stickerService"),
 	}
 }
 
@@ -67,6 +72,8 @@ func (s *stickerServiceImpl) GetStickerSetInfo(ctx context.Context, req *dto.Get
 
 func (s *stickerServiceImpl) BuyStickerSet(ctx context.Context, req *dto.BuyStickerSetRequest) (*dto.BuyStickerResponse, *dtoError.ServiceError) {
 	requestId := common.GetUUID(ctx)
+	ctx, span := s.tracer.Start(ctx, "BuyStickerSet")
+	defer span.End()
 	s.logger.Info(requestId, "start BuyStickerSet", req, nil)
 
 	txContext, tx := repository.SetTxContext(ctx)
@@ -138,6 +145,7 @@ func (s *stickerServiceImpl) BuyStickerSet(ctx context.Context, req *dto.BuyStic
 
 func (s *stickerServiceImpl) GetAllAvailableStickersInfo(ctx context.Context, req *dto.GetAllAvailableStickersInfoRequest) (*dto.GetAllAvailableStickersInfoResponse, *dtoError.ServiceError) {
 	requestId := common.GetUUID(ctx)
+
 	stickerSetCacheMap, keyExist, err := s.stickerCache.GetAllStickerSetInfoByUser(ctx, req.UserID)
 	if err == nil && keyExist {
 		stickerSetInfoList := []*dto.StickerSetInfo{}

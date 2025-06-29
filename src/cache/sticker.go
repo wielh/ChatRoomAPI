@@ -9,6 +9,8 @@ import (
 	"ChatRoomAPI/src"
 
 	"github.com/go-redis/redis/v8"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type StickerSetCacheInfo struct {
@@ -35,6 +37,7 @@ type StickerCache interface {
 type stickerCacheImpl struct {
 	redisClient    *redis.Client
 	keyExpiredTime time.Duration
+	tracer         trace.Tracer
 }
 
 func (s *stickerCacheImpl) getUserStickerInfosKey(userId uint64) string {
@@ -89,6 +92,9 @@ func (s *stickerCacheImpl) GetAllStickerSetInfoByUser(ctx context.Context, userI
 }
 
 func (s *stickerCacheImpl) InsertNewStickerSetInfoByUser(ctx context.Context, userId uint64, info *StickerSetCacheInfo) (bool, error) {
+	ctx, span := s.tracer.Start(ctx, "InsertNewStickerSetInfoByUser")
+	defer span.End()
+
 	infos, keyExist, err := s.GetAllStickerSetInfoByUser(ctx, userId)
 	if err != nil {
 		return false, err
@@ -106,6 +112,8 @@ func (s *stickerCacheImpl) InsertNewStickerSetInfoByUser(ctx context.Context, us
 }
 
 func (s *stickerCacheImpl) StoreStickerSetInfoByUser(ctx context.Context, userId uint64, infos map[uint64]*StickerSetCacheInfo) error {
+	ctx, span := s.tracer.Start(ctx, "StoreStickerSetInfoByUser")
+	defer span.End()
 
 	key := s.getUserStickerInfosKey(userId)
 
@@ -143,6 +151,9 @@ func (s *stickerCacheImpl) StoreStickerSetInfoByUser(ctx context.Context, userId
 }
 
 func (s *stickerCacheImpl) ClearAllStickerCacheByUser(ctx context.Context, userId uint64) error {
+	ctx, span := s.tracer.Start(ctx, "ClearAllStickerCacheByUser")
+	defer span.End()
+
 	mainKey := s.getUserStickerInfosKey(userId)
 	entries, err := s.redisClient.HGetAll(ctx, mainKey).Result()
 	if err != nil {
@@ -175,6 +186,7 @@ func init() {
 	sticker = &stickerCacheImpl{
 		keyExpiredTime: 60 * time.Minute,
 		redisClient:    src.GlobalConfig.Redis,
+		tracer:         otel.Tracer("stickerCache"),
 	}
 }
 

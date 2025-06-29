@@ -7,6 +7,8 @@ import (
 	"errors"
 	"time"
 
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 	"gorm.io/gorm"
 )
 
@@ -19,13 +21,17 @@ type AccountRepository interface {
 }
 
 type accountRepositoryImpl struct {
-	DB *gorm.DB
+	DB     *gorm.DB
+	tracer trace.Tracer
 }
 
 var account AccountRepository
 
 func init() {
-	account = &accountRepositoryImpl{DB: src.GlobalConfig.DB}
+	account = &accountRepositoryImpl{
+		DB:     src.GlobalConfig.DB,
+		tracer: otel.Tracer("accountRepository"),
+	}
 }
 
 func GetAccountRepository() AccountRepository {
@@ -35,6 +41,9 @@ func GetAccountRepository() AccountRepository {
 func (a *accountRepositoryImpl) UserRegister(ctx context.Context,
 	username string, password string, name string, email string, birthday time.Time) (*model.User, bool, error) {
 	tx := GetTxContext(ctx, a.DB)
+	ctx, span := a.tracer.Start(ctx, "UserRegister")
+	defer span.End()
+
 	user := model.User{
 		Username: username,
 		Password: password,
@@ -72,6 +81,9 @@ func (a *accountRepositoryImpl) SelectUserByName(ctx context.Context, username s
 
 func (a *accountRepositoryImpl) UpdatePassword(ctx context.Context, ID uint64, newHashedPassword string) (bool, error) {
 	tx := GetTxContext(ctx, a.DB)
+	ctx, span := a.tracer.Start(ctx, "UpdatePassword")
+	defer span.End()
+
 	result := tx.Model(&model.User{}).Where("id=?", ID).Updates(map[string]interface{}{"password": newHashedPassword})
 	if result.Error != nil {
 		return false, result.Error
