@@ -5,7 +5,7 @@
 範例通訊軟體 API，目前已實現以下功能:
 
 + 登入/註冊/更改用戶訊息
-.
+
 + 以 room 為單位進行通話
 
 + room 有 admin 可以管理成員進出，user 也可以申請加入 room
@@ -18,11 +18,9 @@
 
 ## 用到的技術
 
-gin, gorm, postgresql, redis
+gin, gorm, postgresql, redis, nacos, tempo & OpenTelemetry
 
 ## TODO 
-
-+ 引入 tracer 
 
 + 引入 wire
 
