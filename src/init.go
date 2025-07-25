@@ -2,6 +2,7 @@ package src
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -12,6 +13,9 @@ import (
 	"github.com/gin-contrib/sessions"
 	redisStore "github.com/gin-contrib/sessions/redis"
 	"github.com/go-redis/redis/v8"
+	"github.com/nacos-group/nacos-sdk-go/v2/clients"
+	"github.com/nacos-group/nacos-sdk-go/v2/common/constant"
+	"github.com/nacos-group/nacos-sdk-go/v2/vo"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -58,7 +62,7 @@ type config struct {
 	} `yaml:"database"`
 	Log struct {
 		Level string `yaml:"level"`
-	} `yaml:"log"`
+	} `yaml:"logger"`
 	Redis struct {
 		Address      string `yaml:"address"`
 		Password     string `yaml:"password"`
@@ -70,6 +74,12 @@ type config struct {
 		Host string `yaml:"host"`
 		Port int    `yaml:"port"`
 	}
+	Nacos struct {
+		Host   string `yaml:"host"`
+		Port   int32  `yaml:"port"`
+		DataId string `yaml:"data_id"`
+		Group  string `yaml:"group"`
+	} `yaml:"nacos"`
 }
 
 type allConfigs struct {
@@ -100,6 +110,12 @@ func newGlobalConfig() error {
 			return
 		}
 
+		fmt.Println("nacos init...")
+		err = GlobalConfig.nacosInit()
+		if err != nil {
+			return
+		}
+
 		fmt.Println("pg connection init...")
 		err = GlobalConfig.postgreInit()
 		if err != nil {
@@ -126,16 +142,56 @@ func newGlobalConfig() error {
 func (a *allConfigs) yamlInit() error {
 	file, err := os.Open("config.yaml")
 	if err != nil {
-		log.Fatalf("Error opening file: %v", err)
+		fmt.Printf("Error opening file: %v\n", err)
 		return err
 	}
 	defer file.Close()
 	decoder := yaml.NewDecoder(file)
 	if err := decoder.Decode(&a.YamlConfig); err != nil {
-		log.Fatalf("Error decoding YAML: %v", err)
+		fmt.Printf("Error decoding YAML: %v\n", err)
 		return err
 	}
-	return err
+	return nil
+}
+
+func (a *allConfigs) nacosInit() error {
+	sc := []constant.ServerConfig{
+		*constant.NewServerConfig("127.0.0.1", 8848), // Nacos Server
+	}
+
+	cc := *constant.NewClientConfig(
+		constant.WithNamespaceId(""),
+		constant.WithTimeoutMs(5000),
+		constant.WithNotLoadCacheAtStart(true),
+		constant.WithLogLevel("debug"),
+	)
+
+	var err error
+	Client, err := clients.NewConfigClient(vo.NacosClientParam{
+		ClientConfig:  &cc,
+		ServerConfigs: sc,
+	})
+	if err != nil {
+		return err
+	}
+
+	nacos := a.YamlConfig.Nacos
+	content, err := Client.GetConfig(vo.ConfigParam{
+		DataId: nacos.DataId,
+		Group:  nacos.Group,
+	})
+
+	if content == "" {
+		return errors.New("nacos returned empty config content")
+	}
+
+	err = yaml.Unmarshal([]byte(content), &a.YamlConfig)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("%+v", a.YamlConfig)
+	return nil
 }
 
 func (a *allConfigs) postgreInit() error {

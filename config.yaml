@@ -17,23 +17,13 @@ server:
     repeat: 
       second: 3
       max_request: 1
-database:
+nacos:
   host: "localhost"
-  user: "postgres"
-  password: "..."
-  name: "ginExample"
-  port: 5432
-  sslmode: disable
+  port: 8848
+  data_id: "GinPractice"
+  group: "DEFAULT_GROUP"
 redis:
-  address: "localhost:6379"
-  password: "..."
-  db: 0
   max_connection: 30
   min_connection: 5
-tempo:
-  host: "localhost"
-  port: 4318
 logger:
   level: "info"
-
-  
